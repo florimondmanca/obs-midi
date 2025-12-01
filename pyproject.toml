@@ -1,0 +1,2 @@
+[tool.mypy]
+skip_missing_imports = true
