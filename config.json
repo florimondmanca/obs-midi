@@ -1,0 +1,77 @@
+{
+    "default_channel": 8,
+    "mappings": [
+        {
+            "name": "Ardour Stop",
+            "type": "CC",
+            "number": 64,
+            "value": 0,
+            "action": "SwitchScene",
+            "scene": "EMPTY"
+        },
+        {
+            "type": "CC",
+            "number": 46,
+            "value": 64,
+            "action": "SwitchScene",
+            "scene": "ESUM Logo"
+        },
+        {
+            "type": "CC",
+            "number": 47,
+            "value": 64,
+            "action": "ShowFilter",
+            "source": "Flashlight > White",
+            "filter": "Trigger Flash"
+        },
+        {
+            "type": "CC",
+            "number": 48,
+            "value": 64,
+            "action": "SwitchScene",
+            "scene": "EMPTY"
+        },
+        {
+            "type": "CC",
+            "number": 49,
+            "value": 64,
+            "action": "SwitchScene",
+            "scene": "WOTP > Intro"
+        },
+        {
+            "type": "CC",
+            "number": 50,
+            "value": 64,
+            "action": "SwitchScene",
+            "scene": "Isolated + Handler > Isolated System"
+        },
+        {
+            "type": "CC",
+            "number": 52,
+            "value": 64,
+            "action": "SwitchScene",
+            "scene": "Madness > Phone"
+        },
+        {
+            "type": "CC",
+            "number": 53,
+            "value": 64,
+            "action": "SwitchScene",
+            "scene": "Psycho > Sergent Intro"
+        },
+        {
+            "type": "CC",
+            "number": 53,
+            "value": 65,
+            "action": "SwitchScene",
+            "scene": "Psycho > Sergent 2"
+        },
+        {
+            "type": "CC",
+            "number": 53,
+            "value": 66,
+            "action": "SwitchScene",
+            "scene": "Psycho > Sergent 3"
+        }
+    ]
+}
