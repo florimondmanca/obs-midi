@@ -1,2 +1,3 @@
 [tool.mypy]
 skip_missing_imports = true
+follow_untyped_imports = true

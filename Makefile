@@ -5,3 +5,9 @@ install:
 
 format:
 	venv/bin/ruff format .
+
+list:
+	venv/bin/python main.py list
+
+run:
+	venv/bin/python main.py run -p 20:0 --obs-port 4455 --obs-password alternatepopper14

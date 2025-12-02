@@ -7,71 +7,91 @@
             "number": 64,
             "value": 0,
             "action": "SwitchScene",
-            "scene": "EMPTY"
+            "data": {
+                "scene": "EMPTY"
+            }
         },
         {
             "type": "CC",
             "number": 46,
             "value": 64,
             "action": "SwitchScene",
-            "scene": "ESUM Logo"
+            "data": {
+                "scene": "ESUM Logo"
+            }
         },
         {
             "type": "CC",
             "number": 47,
             "value": 64,
             "action": "ShowFilter",
-            "source": "Flashlight > White",
-            "filter": "Trigger Flash"
+            "data": {
+                "source": "Flashlight > White",
+                "filter": "Trigger Flash"
+            }
         },
         {
             "type": "CC",
             "number": 48,
             "value": 64,
             "action": "SwitchScene",
-            "scene": "EMPTY"
+            "data": {
+                "scene": "EMPTY"
+            }
         },
         {
             "type": "CC",
             "number": 49,
             "value": 64,
             "action": "SwitchScene",
-            "scene": "WOTP > Intro"
+            "data": {
+                "scene": "WOTP > Intro"
+            }
         },
         {
             "type": "CC",
             "number": 50,
             "value": 64,
             "action": "SwitchScene",
-            "scene": "Isolated + Handler > Isolated System"
+            "data": {
+                "scene": "Isolated + Handler > Isolated System"
+            }
         },
         {
             "type": "CC",
             "number": 52,
             "value": 64,
             "action": "SwitchScene",
-            "scene": "Madness > Phone"
+            "data": {
+                "scene": "Madness > Phone"
+            }
         },
         {
             "type": "CC",
             "number": 53,
             "value": 64,
             "action": "SwitchScene",
-            "scene": "Psycho > Sergent Intro"
+            "data": {
+                "scene": "Psycho > Sergent Intro"
+            }
         },
         {
             "type": "CC",
             "number": 53,
             "value": 65,
             "action": "SwitchScene",
-            "scene": "Psycho > Sergent 2"
+            "data": {
+                "scene": "Psycho > Sergent 2"
+            }
         },
         {
             "type": "CC",
             "number": 53,
             "value": 66,
             "action": "SwitchScene",
-            "scene": "Psycho > Sergent 3"
+            "data": {
+                "scene": "Psycho > Sergent 3"
+            }
         }
     ]
 }
