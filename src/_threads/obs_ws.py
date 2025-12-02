@@ -5,13 +5,15 @@ import queue
 import threading
 import time
 import uuid
+from typing import Iterator
+import re
 
 from .._models.command import (
     Command,
-    CommandActionEnum,
     SwitchSceneCommand,
     ShowFilterCommand,
 )
+from .._models.midi import ControlChange, MIDITriggerRepository, MIDITrigger
 import websockets
 import websockets.sync.client
 
@@ -39,10 +41,33 @@ class ObsClient:
 
         payload = {
             "op": 1,
-            "d": {"rpcVersion": 1, "eventSubscriptions": 0, "authentication": auth},
+            "d": {"rpcVersion": 1, "authentication": auth},
         }
 
         self._ws.send(json.dumps(payload))
+
+    def iter_events(self) -> Iterator[dict | None]:
+        while True:
+            try:
+                message = self._ws.recv(timeout=0.2)
+            except TimeoutError:
+                yield None
+                continue
+
+            event = json.loads(message)
+            yield event
+
+    def request_scene_list(self) -> None:
+        # https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md#getscenelist
+        msg = {
+            "op": 6,
+            "d": {
+                "requestType": "GetSceneList",
+                "requestId": str(uuid.uuid4()),
+            },
+        }
+
+        self._ws.send(json.dumps(msg))
 
     def set_current_program_scene(self, name: str) -> None:
         # https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md#setcurrentscenecollection
@@ -77,11 +102,86 @@ class ObsClient:
         self._ws.send(json.dumps(msg))
 
 
-def _run_sender(
+def _parse_cc_trigger(trigger: str) -> ControlChange:
+    # Example: CC46#64@8
+    m = re.match(r"CC(?P<number>\d+)#(?P<value>\d+)@(?P<channel>\d+)", trigger)
+
+    if m is None:
+        raise ValueError(f"Invalid CC trigger: {trigger}")
+
+    return ControlChange(
+        channel=int(m.group("channel")),
+        number=int(m.group("number")),
+        value=int(m.group("value")),
+    )
+
+
+def _parse_scene_triggers(scenes: list[dict]) -> list[tuple[MIDITrigger, str]]:
+    triggers = []
+
+    for scene in scenes:
+        name: str = scene["sceneName"]
+
+        name, sep, trigger = name.rpartition("::")
+
+        if not sep:
+            continue
+
+        name = name.strip()
+        trigger = trigger.strip()
+
+        cc = _parse_cc_trigger(trigger)
+        triggers.append((cc, name))
+
+    return triggers
+
+
+def _run_event_receiver(
+    client: ObsClient,
+    trigger_repository: MIDITriggerRepository,
+    close_event: threading.Event,
+) -> None:
+    def log(*values: object) -> None:
+        print("[ws][events]", *values)
+
+    try:
+        log("Started")
+
+        for event in client.iter_events():
+            if close_event.is_set():
+                break
+
+            if event is None:
+                continue
+
+            # https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md#getscenelist
+            if (
+                event["op"] == 7
+                and event["d"].get("requestType") == "GetSceneList"
+                and event["d"].get("requestStatus", {}).get("result")
+            ):
+                triggers = _parse_scene_triggers(event["d"]["responseData"]["scenes"])
+
+                for trigger, name in triggers:
+                    trigger_repository.add_scene_trigger(trigger, name)
+                    log("Scene trigger added:", trigger, "=>", name)
+
+        log("Stopped")
+    except Exception as exc:
+        log("ERROR:", exc)
+        raise
+
+
+def _run_request_sender(
     client: ObsClient, q: queue.Queue[Command], close_event: threading.Event
 ) -> None:
+    def log(*values: object) -> None:
+        print("[ws][requests]", *values)
+
     try:
-        print("[ws][sender] Started")
+        log("Started")
+
+        client.request_scene_list()
 
         while not close_event.is_set():
             try:
@@ -92,52 +192,73 @@ def _run_sender(
             match command:
                 case SwitchSceneCommand():
                     scene = command.scene
-                    print("[ws][sender] Switch scene:", scene)
+                    log("Switch scene:", scene)
                     client.set_current_program_scene(scene)
                 case ShowFilterCommand():
                     source = command.source
                     filtername = command.filter
-                    print("[ws][sender] Show filter:", source, filtername)
+                    log("Show filter:", source, filtername)
                     client.enable_filter(source, filtername)
 
-        print("[ws][sender] Stopped")
+        log("Stopped")
     except Exception as exc:
-        print("[ws][sender] ERROR:", exc)
+        log("ERROR:", exc)
         raise
 
 
 def run_obs_websocket_client(
-    port: int, password: str, q: queue.Queue, close_event: threading.Event
+    port: int,
+    password: str,
+    trigger_repository: MIDITriggerRepository,
+    q: queue.Queue,
+    close_event: threading.Event,
 ) -> None:
+    def log(*values: object) -> None:
+        print("[ws]", *values)
+
     try:
         with websockets.sync.client.connect(f"ws://localhost:{port}") as ws:
             client = ObsClient(ws)
             client.authenticate(password)
-            print("[ws] Connected")
+            log("Connected")
 
-            sender_t = threading.Thread(
-                target=_run_sender, args=(client, q, close_event)
+            events_t = threading.Thread(
+                target=_run_event_receiver,
+                args=(client, trigger_repository, close_event),
             )
-            sender_t.daemon = True
-            sender_t.start()
+            events_t.daemon = True
+            events_t.start()
 
-            while sender_t.is_alive():
+            requests_t = threading.Thread(
+                target=_run_request_sender, args=(client, q, close_event)
+            )
+            requests_t.daemon = True
+            requests_t.start()
+
+            threads = [events_t, requests_t]
+
+            while any(t.is_alive() for t in threads):
                 time.sleep(0.2)
 
-            sender_t.join()
+            for t in threads:
+                t.join()
+
+        log("Stopped")
 
     except Exception as exc:
-        print("[ws] ERROR:", exc)
+        log("ERROR:", exc)
 
 
 def start_obs_ws_client_thread(
     port: int,
     password: str,
+    trigger_repository: MIDITriggerRepository,
     q: queue.Queue,
     close_event: threading.Event,
 ) -> threading.Thread:
     thread = threading.Thread(
-        target=run_obs_websocket_client, args=(port, password, q, close_event)
+        target=run_obs_websocket_client,
+        args=(port, password, trigger_repository, q, close_event),
     )
     thread.daemon = True
     thread.start()
