@@ -9,12 +9,12 @@ from src.application.event_handlers import (
 )
 from src.domain.command import Command
 from src.domain.midi import MIDITriggerRepository
-from src.infrastructure.adapters.midi import get_midi_ports
+from src.infrastructure.adapters.argparse import EnvDefault
 from src.infrastructure.threads.midi import MIDIListener
 from src.infrastructure.threads.obs_ws import ObsWebSocketController
 
 
-def run(midi_port: str, obs_port: int, obs_password: str) -> None:
+def run(midi_port: str | None, obs_port: int, obs_password: str) -> None:
     midi_queue: queue.Queue[Command] = queue.Queue(10)
     close_event = threading.Event()
 
@@ -56,36 +56,50 @@ def run(midi_port: str, obs_port: int, obs_password: str) -> None:
         _close_threads()
 
 
-def list_ports() -> None:
-    for port in get_midi_ports():
-        print(port)
-
-
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers()
+    parser = argparse.ArgumentParser(
+        description="Control OBS with MIDI via obs-websocket",
+    )
 
-    parser_list_ports = subparsers.add_parser("list", help="List MIDI ports")
-    parser_list_ports.set_defaults(func=lambda args: list_ports())
-
-    parser_listen = subparsers.add_parser("run", help="Run MIDI / obs-websocket bridge")
-    parser_listen.add_argument("-p", "--midi-port", help="MIDI port")
-    parser_listen.add_argument("--obs-port", help="obs-websocket port", default=4455)
-    parser_listen.add_argument("--obs-password", help="obs-websocket password")
-    parser_listen.set_defaults(
-        func=lambda args: run(
-            midi_port=args.midi_port,
-            obs_port=args.obs_port,
-            obs_password=args.obs_password,
+    parser.add_argument(
+        "-p",
+        "--midi-port",
+        action=EnvDefault,
+        env_var="MIDI_PORT",
+        required=False,
+        help="MIDI port",
+    )
+    parser.add_argument(
+        "--obs-port",
+        action=EnvDefault,
+        env_var="OBS_PORT",
+        help="obs-websocket port",
+    )
+    parser.add_argument(
+        "--obs-password",
+        action=EnvDefault,
+        env_var="OBS_PASSWORD",
+        help="obs-websocket password",
+    )
+    parser.set_defaults(
+        impl=(
+            parser,
+            lambda args: run(
+                midi_port=args.midi_port,
+                obs_port=args.obs_port,
+                obs_password=args.obs_password,
+            ),
         )
     )
 
     args = parser.parse_args()
 
     try:
-        func = args.func
-    except AttributeError:
-        parser.print_help()
+        run(
+            midi_port=args.midi_port,
+            obs_port=args.obs_port,
+            obs_password=args.obs_password,
+        )
+    except Exception as exc:
+        print("ERROR:", exc)
         raise SystemExit(1)
-
-    func(args)

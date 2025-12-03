@@ -60,8 +60,9 @@ class MIDIListener:
         try:
             midiin, port_name = open_midiinput(
                 self._port,
+                use_virtual=False,
                 client_name="python-obs-midi",
-                port_name="MIDI Input",
+                port_name="Midi In",
             )
 
             midiin.set_callback(
