@@ -1,7 +1,14 @@
-import re
-
 from ..domain.midi import ControlChange, MIDITriggerRepository
-from ..domain.obs import Event, EventHandler, SceneListChangedEvent
+from ..domain.obs import (
+    Event,
+    EventHandler,
+    FilterListReceivedEvent,
+    SceneListReceivedEvent,
+)
+
+
+def log(*values: object) -> None:
+    print("[MIDI]", *values)
 
 
 def make_obs_event_handler(event_handlers: list[EventHandler]) -> EventHandler:
@@ -12,36 +19,31 @@ def make_obs_event_handler(event_handlers: list[EventHandler]) -> EventHandler:
     return on_obs_event
 
 
-def make_handle_scene_list_changed(
+def make_handle_scene_list_received(
     trigger_repository: MIDITriggerRepository,
 ) -> EventHandler:
-    def handle_scene_list_changed(event: Event) -> None:
-        if not isinstance(event, SceneListChangedEvent):
+    def handle_scene_list_received(event: Event) -> None:
+        if not isinstance(event, SceneListReceivedEvent):
             return
 
         for scene in event.scenes:
-            _, sep, cc_trigger = scene.name.rpartition("::")
+            if (cc := ControlChange.parse_at_end_of(scene.name)) is not None:
+                trigger_repository.add_scene_trigger(cc, scene.name)
+                log("Detected scene trigger:", scene.name)
 
-            if not sep:
-                continue
+    return handle_scene_list_received
 
-            cc_trigger = cc_trigger.strip()
 
-            # Example: CC46#64@8
-            m = re.match(
-                r"CC(?P<number>\d+)#(?P<value>\d+)@(?P<channel>\d+)", cc_trigger
-            )
+def make_handle_filter_list_received(
+    trigger_repository: MIDITriggerRepository,
+) -> EventHandler:
+    def handle_filter_list_received(event: Event) -> None:
+        if not isinstance(event, FilterListReceivedEvent):
+            return
 
-            if m is None:
-                raise ValueError(f"Invalid CC trigger: {cc_trigger}")
+        for filter in event.filters:
+            if (cc := ControlChange.parse_at_end_of(filter.name)) is not None:
+                trigger_repository.add_scene_trigger(cc, filter.name)
+                log("Detected filter trigger:", filter.name)
 
-            control_change = ControlChange(
-                channel=int(m.group("channel")),
-                number=int(m.group("number")),
-                value=int(m.group("value")),
-            )
-
-            trigger_repository.add_scene_trigger(control_change, scene.name)
-            # log("Scene trigger added:", cc_trigger, "=>", _)
-
-    return handle_scene_list_changed
+    return handle_filter_list_received

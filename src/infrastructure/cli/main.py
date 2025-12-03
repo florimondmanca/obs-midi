@@ -4,7 +4,8 @@ import threading
 import time
 
 from src.application.event_handlers import (
-    make_handle_scene_list_changed,
+    make_handle_filter_list_received,
+    make_handle_scene_list_received,
     make_obs_event_handler,
 )
 from src.domain.command import Command
@@ -28,7 +29,10 @@ def run(midi_port: str | None, obs_port: int, obs_password: str) -> None:
     midi_t = midi_listener.start_thread(close_event=close_event)
 
     on_obs_event = make_obs_event_handler(
-        [make_handle_scene_list_changed(trigger_repository)]
+        [
+            make_handle_scene_list_received(trigger_repository),
+            make_handle_filter_list_received(trigger_repository),
+        ]
     )
 
     obs_controller = ObsWebSocketController(

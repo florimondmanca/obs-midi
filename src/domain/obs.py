@@ -8,10 +8,20 @@ class Scene:
 
 
 @dataclass(frozen=True, kw_only=True)
-class SceneListChangedEvent:
+class SceneListReceivedEvent:
     scenes: list[Scene]
 
 
-Event = SceneListChangedEvent
+@dataclass(frozen=True, kw_only=True)
+class Filter:
+    name: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class FilterListReceivedEvent:
+    filters: list[Filter]
+
+
+Event = SceneListReceivedEvent | FilterListReceivedEvent
 
 EventHandler = Callable[[Event], None]

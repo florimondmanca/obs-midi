@@ -11,7 +11,13 @@ from src.domain.command import (
     ShowFilterCommand,
     SwitchSceneCommand,
 )
-from src.domain.obs import Event, Scene, SceneListChangedEvent
+from src.domain.obs import (
+    Event,
+    Filter,
+    FilterListReceivedEvent,
+    Scene,
+    SceneListReceivedEvent,
+)
 from src.infrastructure.adapters.obs_client import ObsClient
 
 
@@ -83,19 +89,30 @@ class ObsWebSocketController:
                     continue
 
                 # https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md#getscenelist
-                if (
-                    event["op"] == 7
-                    and event["d"].get("requestType") == "GetSceneList"
-                    and event["d"].get("requestStatus", {}).get("result")
-                ):
-                    self._on_event(
-                        SceneListChangedEvent(
-                            scenes=[
-                                Scene(name=scene["sceneName"])
-                                for scene in event["d"]["responseData"]["scenes"]
-                            ]
+                if client.is_request_response(event, "GetSceneList"):
+                    scenes = [
+                        Scene(name=scene["sceneName"])
+                        for scene in event["d"]["responseData"]["scenes"]
+                    ]
+
+                    self._on_event(SceneListReceivedEvent(scenes=scenes))
+
+                    for scene in scenes:
+                        client.request_scene_items_list(scene.name)
+
+                if client.is_request_response(event, "GetSceneItemList"):
+                    for data in event["d"]["responseData"]["sceneItems"]:
+                        client.request_source_filter_list(
+                            source_name=data["sourceName"]
                         )
-                    )
+
+                if client.is_request_response(event, "GetSourceFilterList"):
+                    filters = [
+                        Filter(name=data["filterName"])
+                        for data in event["d"]["responseData"]["filters"]
+                    ]
+
+                    self._on_event(FilterListReceivedEvent(filters=filters))
 
             log("Stopped")
         except websockets.exceptions.ConnectionClosed:

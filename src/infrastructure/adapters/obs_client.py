@@ -46,6 +46,13 @@ class ObsClient:
             event = json.loads(message)
             yield event
 
+    def is_request_response(self, event: dict, request_type: str) -> bool:
+        return (
+            event["op"] == 7
+            and event["d"].get("requestType") == request_type
+            and event["d"].get("requestStatus", {}).get("result")
+        )
+
     def request_scene_list(self) -> None:
         # https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md#getscenelist
         msg = {
@@ -53,6 +60,34 @@ class ObsClient:
             "d": {
                 "requestType": "GetSceneList",
                 "requestId": str(uuid.uuid4()),
+            },
+        }
+
+        self._ws.send(json.dumps(msg))
+
+    def request_scene_items_list(self, scene_name: str) -> None:
+        msg = {
+            "op": 6,
+            "d": {
+                "requestType": "GetSceneItemList",
+                "requestId": str(uuid.uuid4()),
+                "requestData": {
+                    "sceneName": scene_name,
+                },
+            },
+        }
+
+        self._ws.send(json.dumps(msg))
+
+    def request_source_filter_list(self, source_name: str) -> None:
+        msg = {
+            "op": 6,
+            "d": {
+                "requestType": "GetSourceFilterList",
+                "requestId": str(uuid.uuid4()),
+                "requestData": {
+                    "sourceName": source_name,
+                },
             },
         }
 
