@@ -2,20 +2,21 @@ import base64
 import hashlib
 import json
 import queue
+import re
 import threading
 import time
 import uuid
 from typing import Iterator
-import re
+
+import websockets
+import websockets.sync.client
 
 from .._models.command import (
     Command,
-    SwitchSceneCommand,
     ShowFilterCommand,
+    SwitchSceneCommand,
 )
-from .._models.midi import ControlChange, MIDITriggerRepository, MIDITrigger
-import websockets
-import websockets.sync.client
+from .._models.midi import ControlChange, MIDITrigger, MIDITriggerRepository
 
 
 class ObsClient:

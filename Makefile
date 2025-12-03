@@ -3,8 +3,12 @@ install:
 	venv/bin/pip install -U pip setuptools wheel
 	venv/bin/pip install -r requirements.txt
 
+check:
+	venv/bin/ruff check --select I
+
 format:
-	venv/bin/ruff format .
+	venv/bin/ruff check --select I --fix
+	venv/bin/ruff format
 
 list:
 	venv/bin/python main.py list

@@ -1,10 +1,10 @@
 import queue
-import time
 import threading
+import time
 
 from .._models.midi import MIDITriggerRepository
-from .._threads.obs_ws import start_obs_ws_client_thread
 from .._threads.midi import start_midi_in_thread
+from .._threads.obs_ws import start_obs_ws_client_thread
 
 
 def run(midi_port: str, obs_port: int, obs_password: str) -> None:
