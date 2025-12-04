@@ -1,11 +1,14 @@
 import base64
 import hashlib
 import json
+import logging
 import uuid
 from typing import Any, Iterator
 
 import websockets
 import websockets.sync.connection
+
+logger = logging.getLogger(__name__)
 
 
 def open_obs_client(port: int, password: str) -> "ObsClient":

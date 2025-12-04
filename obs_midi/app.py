@@ -1,27 +1,11 @@
-from dataclasses import dataclass
+import logging
 
 import mido
 
 from .midi import ControlChange, MIDITrigger
 from .obs_client import ObsClient
 
-
-def log(*values: object) -> None:
-    print("[app]", *values)
-
-
-@dataclass(frozen=True, kw_only=True)
-class SwitchSceneCommand:
-    scene: str
-
-
-@dataclass(frozen=True, kw_only=True)
-class ShowFilterCommand:
-    source: str
-    filter: str
-
-
-Command = SwitchSceneCommand | ShowFilterCommand
+logger = logging.getLogger(__name__)
 
 
 class App:
@@ -45,7 +29,7 @@ class App:
 
                     if (cc := ControlChange.parse_at_end_of(scene_name)) is not None:
                         self._scene_triggers.append((cc, scene_name))
-                        log("Detected scene trigger:", scene_name)
+                        logger.info("Detected scene trigger: %s", scene_name)
 
                     self.client.send_request(
                         "GetSceneItemList", {"sceneName": scene_name}
@@ -67,17 +51,17 @@ class App:
                         self._source_filter_triggers.append(
                             (cc, source_name, filter_name)
                         )
-                        log("Detected filter trigger:", filter_name)
+                        logger.info("Detected filter trigger: %s", filter_name)
 
     def on_midi_message(self, msg: mido.Message) -> None:
         for trigger, scene in self._scene_triggers:
             if trigger.matches(msg):
-                log("Switch scene:", scene)
+                logger.info("Switch scene: %s", scene)
                 self.client.set_current_program_scene(scene)
                 return
 
         for trigger, source_name, filter_name in self._source_filter_triggers:
             if trigger.matches(msg):
-                log("Show filter:", source_name, filter_name)
+                logger.info("Show filter: %s", source_name, filter_name)
                 self.client.enable_filter(source_name, filter_name)
                 return

@@ -1,59 +1,47 @@
 import argparse
+import logging
+import logging.config
 import threading
-import time
-
-import websockets.sync.client
 
 from .app import App
+from .logging import LOGGING_CONFIG
 from .midi_in import MIDInputThread
 from .obs_client import open_obs_client
 from .obs_events import ObsEventsThread
 from .utils.argparse import EnvDefault
+from .utils.threading import start_thread_manager
 
-
-def log(*values: object) -> None:
-    print("[main]", *values)
+logger = logging.getLogger(__name__)
 
 
 def run(midi_port: str | None, obs_port: int, obs_password: str) -> None:
     midi_ready_event = threading.Event()
-    close_event = threading.Event()
 
     with open_obs_client(port=obs_port, password=obs_password) as client:
         app = App(client=client)
 
-        threads = [
-            MIDInputThread(
+        with start_thread_manager(
+            lambda close_event: MIDInputThread(
                 app=app,
                 port=midi_port,
                 midi_ready_event=midi_ready_event,
                 close_event=close_event,
+                daemon=True,
             ),
-            ObsEventsThread(
-                app=app, start_event=midi_ready_event, close_event=close_event
+            lambda close_event: ObsEventsThread(
+                app=app,
+                start_event=midi_ready_event,
+                close_event=close_event,
+                daemon=True,
             ),
-        ]
+        ) as thread_manager:
+            midi_ready_event.wait()
+            app.send_initial_request()
 
-        for thread in threads:
-            thread.daemon = True
-            thread.start()
-
-        midi_ready_event.wait()
-        app.send_initial_request()
-
-        def _close_threads() -> None:
-            close_event.set()
-
-            for t in threads:
-                t.join()
-
-        try:
-            while all(t.is_alive() for t in threads):
-                time.sleep(0.2)
-            _close_threads()
-        except KeyboardInterrupt:
-            print("Exiting...")
-            _close_threads()
+            try:
+                thread_manager.poll_all()
+            except KeyboardInterrupt:
+                print("Exiting...")
 
 
 def main() -> None:
@@ -81,6 +69,13 @@ def main() -> None:
         env_var="OBS_PASSWORD",
         help="obs-websocket password",
     )
+    parser.add_argument(
+        "--log-level",
+        action=EnvDefault,
+        env_var="LOG_LEVEL",
+        required=False,
+        help="Logging level",
+    )
     parser.set_defaults(
         impl=(
             parser,
@@ -94,6 +89,12 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    logging.config.dictConfig(LOGGING_CONFIG)
+
+    if args.log_level is not None:
+        log_level = getattr(logging, args.log_level.upper())
+        logging.getLogger("obs_midi").setLevel(log_level)
+
     try:
         run(
             midi_port=args.midi_port,
@@ -101,5 +102,9 @@ def main() -> None:
             obs_password=args.obs_password,
         )
     except Exception as exc:
-        log("ERROR:", exc)
+        if log_level == logging.DEBUG:
+            logger.exception(exc)
+        else:
+            logger.error(exc)
+
         raise SystemExit(1)

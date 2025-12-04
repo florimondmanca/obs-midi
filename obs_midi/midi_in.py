@@ -1,10 +1,14 @@
+import logging
 import threading
 import time
+from typing import Any
 
 import mido
 from rtmidi.midiutil import open_midiinput
 
 from .app import App
+
+logger = logging.getLogger(__name__)
 
 
 class MIDInputThread(threading.Thread):
@@ -15,8 +19,9 @@ class MIDInputThread(threading.Thread):
         app: App,
         midi_ready_event: threading.Event,
         close_event: threading.Event,
+        **kwargs: Any,
     ) -> None:
-        super().__init__()
+        super().__init__(**kwargs)
         self._port = port
         self._app = app
         self._midi_ready_event = midi_ready_event
@@ -25,7 +30,7 @@ class MIDInputThread(threading.Thread):
     def run(
         self,
     ) -> None:
-        print(f"Selected port: {self._port}")
+        logger.debug("Selected port: %s", self._port)
 
         try:
             midi_input, port_name = open_midiinput(
@@ -41,25 +46,25 @@ class MIDInputThread(threading.Thread):
                 try:
                     msg_bytes, _ = event
                     msg: mido.Message = mido.parse(msg_bytes)
-                    print(f"[MIDI] Msg: {msg}")
+                    logger.debug("Incoming message: %s", msg)
                     self._app.on_midi_message(msg)
                 except Exception as exc:
-                    print("[MIDI] ERROR:", exc)
+                    logger.error(exc)
                     raise
 
             with midi_input:
-                print("[MIDI] Listening for messages...")
+                logger.info("Listening for messages...")
                 self._midi_ready_event.set()
 
                 try:
                     while not self._close_event.is_set():
                         time.sleep(0.2)
-                    print("[MIDI] Stopped")
+                    logger.info("Stopped")
                 except KeyboardInterrupt:
-                    print("[MIDI] Closing...")
+                    pass
 
         except Exception as exc:
-            print("[MIDI] ERROR:", exc)
+            logger.error(exc)
             self._midi_ready_event.set()
             self._close_event.set()
             raise
