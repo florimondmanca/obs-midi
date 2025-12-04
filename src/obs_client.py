@@ -2,16 +2,33 @@ import base64
 import hashlib
 import json
 import uuid
-from typing import Iterator
+from typing import Any, Iterator
 
 import websockets
+import websockets.sync.connection
+
+
+def open_obs_client(port: int, password: str) -> "ObsClient":
+    ws = websockets.sync.client.connect(f"ws://localhost:{port}")
+    client = ObsClient(ws)
+    client.authenticate(password)
+    return client
 
 
 class ObsClient:
     # https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md
 
+    REQUEST_GET_SCENE_LIST = "GetSceneList"
+
     def __init__(self, ws: websockets.sync.connection.Connection) -> None:
         self._ws = ws
+        self._request_data_entries: dict[str, dict] = {}
+
+    def __enter__(self) -> "ObsClient":
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        return self._ws.__exit__(*args)
 
     def authenticate(self, password: str) -> None:
         server_hello = json.loads(self._ws.recv())
@@ -46,50 +63,27 @@ class ObsClient:
             event = json.loads(message)
             yield event
 
-    def is_request_response(self, event: dict, request_type: str) -> bool:
-        return (
-            event["op"] == 7
-            and event["d"].get("requestType") == request_type
-            and event["d"].get("requestStatus", {}).get("result")
-        )
+    def get_request_data(self, request_id: str) -> dict:
+        return self._request_data_entries.get(request_id, {})
 
-    def request_scene_list(self) -> None:
+    def is_request_response(self, event: dict) -> bool:
+        return event["op"] == 7 and event["d"].get("requestStatus", {}).get("result")
+
+    def send_request(self, request_type: str, request_data: dict | None = None) -> None:
         # https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md#getscenelist
-        msg = {
+        request_id = str(uuid.uuid4())
+
+        msg: dict = {
             "op": 6,
             "d": {
-                "requestType": "GetSceneList",
-                "requestId": str(uuid.uuid4()),
+                "requestType": request_type,
+                "requestId": request_id,
             },
         }
 
-        self._ws.send(json.dumps(msg))
-
-    def request_scene_items_list(self, scene_name: str) -> None:
-        msg = {
-            "op": 6,
-            "d": {
-                "requestType": "GetSceneItemList",
-                "requestId": str(uuid.uuid4()),
-                "requestData": {
-                    "sceneName": scene_name,
-                },
-            },
-        }
-
-        self._ws.send(json.dumps(msg))
-
-    def request_source_filter_list(self, source_name: str) -> None:
-        msg = {
-            "op": 6,
-            "d": {
-                "requestType": "GetSourceFilterList",
-                "requestId": str(uuid.uuid4()),
-                "requestData": {
-                    "sourceName": source_name,
-                },
-            },
-        }
+        if request_data is not None:
+            msg["d"]["requestData"] = request_data
+            self._request_data_entries[request_id] = request_data
 
         self._ws.send(json.dumps(msg))
 
