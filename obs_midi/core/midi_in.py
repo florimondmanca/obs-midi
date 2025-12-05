@@ -17,14 +17,14 @@ class MIDInputThread(threading.Thread):
         *,
         port: str | None,
         app: App,
-        midi_ready_event: threading.Event,
+        ready_event: threading.Event,
         close_event: threading.Event,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self._port = port
         self._app = app
-        self._midi_ready_event = midi_ready_event
+        self._ready_event = ready_event
         self._close_event = close_event
 
     def run(
@@ -54,7 +54,7 @@ class MIDInputThread(threading.Thread):
 
             with midi_input:
                 logger.info("Listening for messages...")
-                self._midi_ready_event.set()
+                self._ready_event.set()
 
                 try:
                     while not self._close_event.is_set():
@@ -65,6 +65,6 @@ class MIDInputThread(threading.Thread):
 
         except Exception as exc:
             logger.error(exc)
-            self._midi_ready_event.set()
+            self._ready_event.set()
             self._close_event.set()
             raise

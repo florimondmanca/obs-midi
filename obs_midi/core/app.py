@@ -1,4 +1,5 @@
 import logging
+from typing import Callable
 
 import mido
 
@@ -9,10 +10,13 @@ logger = logging.getLogger(__name__)
 
 
 class App:
-    def __init__(self, client: ObsClient) -> None:
+    def __init__(
+        self, client: ObsClient, on_ready: Callable[[], None] = lambda: None
+    ) -> None:
         self._client = client
         self._scene_triggers: list[tuple[MIDITrigger, str]] = []
         self._source_filter_triggers: list[tuple[MIDITrigger, str, str]] = []
+        self._on_ready = on_ready
 
     @property
     def client(self) -> ObsClient:
@@ -52,6 +56,8 @@ class App:
                             (cc, source_name, filter_name)
                         )
                         logger.info("Detected filter trigger: %s", filter_name)
+
+                self._on_ready()
 
     def on_midi_message(self, msg: mido.Message) -> None:
         for trigger, scene in self._scene_triggers:

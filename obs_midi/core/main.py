@@ -2,6 +2,7 @@ import logging
 import logging.config
 import threading
 import time
+from typing import Callable
 
 from .app import App
 from .midi_in import MIDInputThread
@@ -16,21 +17,21 @@ def run(
     obs_port: int,
     obs_password: str,
     *,
-    ready_event: threading.Event | None = None,
+    on_ready: Callable[[], None] = lambda: None,
     close_event: threading.Event | None = None,
 ) -> None:
+    midi_ready_event = threading.Event()
+
     if close_event is None:
         close_event = threading.Event()
 
-    midi_ready_event = threading.Event()
-
     with open_obs_client(port=obs_port, password=obs_password) as client:
-        app = App(client=client)
+        app = App(client=client, on_ready=on_ready)
 
         midi_input_thread = MIDInputThread(
             app=app,
             port=midi_port,
-            midi_ready_event=midi_ready_event,
+            ready_event=midi_ready_event,
             close_event=close_event,
             daemon=True,
         )
