@@ -1,50 +1,15 @@
 import argparse
 import logging
 import logging.config
-import threading
 
-from .app import App
+from .core.main import run
 from .logging import LOGGING_CONFIG
-from .midi_in import MIDInputThread
-from .obs_client import open_obs_client
-from .obs_events import ObsEventsThread
 from .utils.argparse import EnvDefault
-from .utils.threading import start_thread_manager
 
 logger = logging.getLogger(__name__)
 
 
-def run(midi_port: str | None, obs_port: int, obs_password: str) -> None:
-    midi_ready_event = threading.Event()
-
-    with open_obs_client(port=obs_port, password=obs_password) as client:
-        app = App(client=client)
-
-        with start_thread_manager(
-            lambda close_event: MIDInputThread(
-                app=app,
-                port=midi_port,
-                midi_ready_event=midi_ready_event,
-                close_event=close_event,
-                daemon=True,
-            ),
-            lambda close_event: ObsEventsThread(
-                app=app,
-                start_event=midi_ready_event,
-                close_event=close_event,
-                daemon=True,
-            ),
-        ) as thread_manager:
-            midi_ready_event.wait()
-            app.send_initial_request()
-
-            try:
-                thread_manager.poll_all()
-            except KeyboardInterrupt:
-                print("Exiting...")
-
-
-def main() -> None:
+def run_cli() -> None:
     parser = argparse.ArgumentParser(
         description="Control OBS with MIDI via obs-websocket",
     )
@@ -76,6 +41,10 @@ def main() -> None:
         required=False,
         help="Logging level",
     )
+    parser.add_argument(
+        "--gui",
+        action="store_true",
+    )
     parser.set_defaults(
         impl=(
             parser,
@@ -96,11 +65,16 @@ def main() -> None:
         logging.getLogger("obs_midi").setLevel(log_level)
 
     try:
-        run(
-            midi_port=args.midi_port,
-            obs_port=args.obs_port,
-            obs_password=args.obs_password,
-        )
+        if args.gui:
+            from .gui import run_gui
+
+            run_gui()
+        else:
+            run(
+                midi_port=args.midi_port,
+                obs_port=args.obs_port,
+                obs_password=args.obs_password,
+            )
     except Exception as exc:
         if log_level == logging.DEBUG:
             logger.exception(exc)

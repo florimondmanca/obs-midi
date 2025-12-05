@@ -27,4 +27,4 @@ input_ports:
 	venv/bin/python -c "import mido; print(*mido.get_input_names(), sep='\n')"
 
 run:
-	venv/bin/python main.py ${ARGS}
+	venv/bin/python main.py --gui
