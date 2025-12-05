@@ -1,3 +1,4 @@
+import logging
 import threading
 import tkinter as tk
 from tkinter import ttk
@@ -6,6 +7,7 @@ import mido
 from ttkthemes import ThemedTk
 
 from .core.main import run
+from .logging import LOGGING_CONFIG
 
 INPUT_WIDTH = 35
 FIELD_PADY = 5
@@ -172,3 +174,8 @@ class MainPage(ttk.Frame):
         t.daemon = True
         t.start()
         self._thread = t
+
+
+if __name__ == "__main__":
+    logging.config.dictConfig(LOGGING_CONFIG)
+    run_gui()

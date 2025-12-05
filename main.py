@@ -1,4 +1,4 @@
-from obs_midi.cli import run_cli
+from obs_midi.gui import run_gui
 
 if __name__ == "__main__":
-    run_cli()
+    run_gui()

@@ -41,10 +41,6 @@ def run_cli() -> None:
         required=False,
         help="Logging level",
     )
-    parser.add_argument(
-        "--gui",
-        action="store_true",
-    )
     parser.set_defaults(
         impl=(
             parser,
@@ -58,23 +54,16 @@ def run_cli() -> None:
 
     args = parser.parse_args()
 
-    logging.config.dictConfig(LOGGING_CONFIG)
-
     if args.log_level is not None:
         log_level = getattr(logging, args.log_level.upper())
         logging.getLogger("obs_midi").setLevel(log_level)
 
     try:
-        if args.gui:
-            from .gui import run_gui
-
-            run_gui()
-        else:
-            run(
-                midi_port=args.midi_port,
-                obs_port=args.obs_port,
-                obs_password=args.obs_password,
-            )
+        run(
+            midi_port=args.midi_port,
+            obs_port=args.obs_port,
+            obs_password=args.obs_password,
+        )
     except Exception as exc:
         if log_level == logging.DEBUG:
             logger.exception(exc)
@@ -82,3 +71,8 @@ def run_cli() -> None:
             logger.error(exc)
 
         raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    logging.config.dictConfig(LOGGING_CONFIG)
+    run_cli()
