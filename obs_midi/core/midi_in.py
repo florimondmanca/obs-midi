@@ -1,7 +1,8 @@
 import logging
+import queue
 import threading
 import time
-from typing import Any
+from typing import Any, Callable
 
 import mido
 from rtmidi.midiutil import open_midiinput
@@ -15,17 +16,22 @@ class MIDInputThread(threading.Thread):
     def __init__(
         self,
         *,
-        port: str | None,
         app: App,
+        port: str | None,
+        interactive: bool,
+        on_error: Callable[[Exception], None] = lambda exc: None,
         ready_event: threading.Event,
         close_event: threading.Event,
+        error_bucket: queue.Queue[Exception],
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-        self._port = port
         self._app = app
+        self._port = port
+        self._interactive = interactive
         self._ready_event = ready_event
         self._close_event = close_event
+        self._error_bucket = error_bucket
 
     def run(
         self,
@@ -35,9 +41,10 @@ class MIDInputThread(threading.Thread):
         try:
             midi_input, port_name = open_midiinput(
                 self._port,
-                use_virtual=False,
-                client_name="python-obs-midi",
+                use_virtual=not self._interactive,
+                client_name="OBS MIDI",
                 port_name="Midi In",
+                interactive=self._interactive,
             )
 
             # https://spotlightkid.github.io/python-rtmidi/rtmidi.html#rtmidi.MidiIn.set_callback
@@ -67,4 +74,4 @@ class MIDInputThread(threading.Thread):
             logger.error(exc)
             self._ready_event.set()
             self._close_event.set()
-            raise
+            self._error_bucket.put_nowait(exc)

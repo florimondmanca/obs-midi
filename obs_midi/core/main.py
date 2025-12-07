@@ -1,5 +1,6 @@
 import logging
 import logging.config
+import queue
 import threading
 import time
 from typing import Callable
@@ -17,6 +18,7 @@ def run(
     obs_port: int,
     obs_password: str,
     *,
+    interactive: bool,
     on_ready: Callable[[], None] = lambda: None,
     close_event: threading.Event | None = None,
 ) -> None:
@@ -25,14 +27,18 @@ def run(
     if close_event is None:
         close_event = threading.Event()
 
+    error_bucket: queue.Queue[Exception] = queue.Queue()
+
     with open_obs_client(port=obs_port, password=obs_password) as client:
         app = App(client=client, on_ready=on_ready)
 
         midi_input_thread = MIDInputThread(
             app=app,
             port=midi_port,
+            interactive=interactive,
             ready_event=midi_ready_event,
             close_event=close_event,
+            error_bucket=error_bucket,
             daemon=True,
         )
 
@@ -52,7 +58,9 @@ def run(
             thread.start()
 
         def close_all_threads() -> None:
-            pass
+            close_event.set()
+            for thread in threads:
+                thread.join()
 
         midi_ready_event.wait()
         app.send_initial_request()
@@ -64,7 +72,12 @@ def run(
                 if close_event.is_set():
                     break
 
-            close_all_threads()
+            try:
+                exc = error_bucket.get_nowait()
+            except queue.Empty:
+                pass
+            else:
+                raise exc
         except KeyboardInterrupt:
             print("Exiting...")
         finally:

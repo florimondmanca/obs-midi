@@ -25,6 +25,9 @@ format:
 input_ports:
 	venv/bin/python -c "import mido; print(*mido.get_input_names(), sep='\n')"
 
+run:
+	venv/bin/python -m obs_midi.gui ${ARGS}
+
 dist:
 	venv/bin/python -m obs_midi.packaging.build
 

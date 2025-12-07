@@ -41,16 +41,6 @@ def run_cli() -> None:
         required=False,
         help="Logging level",
     )
-    parser.set_defaults(
-        impl=(
-            parser,
-            lambda args: run(
-                midi_port=args.midi_port,
-                obs_port=args.obs_port,
-                obs_password=args.obs_password,
-            ),
-        )
-    )
 
     args = parser.parse_args()
 
@@ -63,6 +53,7 @@ def run_cli() -> None:
             midi_port=args.midi_port,
             obs_port=args.obs_port,
             obs_password=args.obs_password,
+            interactive=True,
         )
     except Exception as exc:
         if log_level == logging.DEBUG:

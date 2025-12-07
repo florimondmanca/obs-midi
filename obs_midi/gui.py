@@ -1,7 +1,9 @@
+import argparse
 import logging
 import threading
 import tkinter as tk
 from tkinter import ttk
+from typing import Callable
 
 import mido
 from ttkthemes import ThemedTk
@@ -9,20 +11,31 @@ from ttkthemes import ThemedTk
 from .core.main import run
 from .logging import LOGGING_CONFIG
 
-INPUT_WIDTH = 35
-FIELD_PADY = 5
+Callback = Callable[[], None]
 
 
 def run_gui() -> None:
+    logging.config.dictConfig(LOGGING_CONFIG)
+
     root = ThemedTk(
-        theme="yaru",
         # This should match the StartupWMClass in 'obs-midi.desktop' so that
         # under Linux, X server knows to group the tkinter window with the launcher icon.
         className="obs-midi",
     )
-    root.title("python-obs-midi")
+
+    parser = argparse.ArgumentParser(prog="obs-midi")
+    parser.set_defaults(theme="yaru")
+    args = parser.parse_args()
+
+    root.set_theme(args.theme)
+    root.title("OBS MIDI")
+
     MainApplication(root)
-    root.mainloop()
+
+    try:
+        root.mainloop()
+    except KeyboardInterrupt:
+        pass
 
 
 class MainApplication:
@@ -48,73 +61,131 @@ class MainPage(ttk.Frame):
         self._thread: threading.Thread | None = None
         self._close_event = threading.Event()
 
-        header = ttk.Frame(self, padding=(0, 10))
-        ttk.Label(header, text="OBS MIDI", justify="center").pack(expand=True)
+        config_form = ConfigForm(self)
+        config_form.config(padding=30)
 
-        config = ttk.Frame(self, padding=(10, 10), borderwidth=1, border=10)
+        footer = ttk.Frame(self, padding=30)
+        ttk.Button(footer, text="Quit", command=app.quit).pack()
+
+        config_form.grid(row=0, column=0, sticky="n")
+        footer.grid(row=1, column=0, sticky="we")
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+    def start_application(
+        self,
+        *,
+        midi_port: str | None,
+        obs_port: int,
+        obs_password: str,
+        on_ready: Callback = lambda: None,
+        on_error: Callback = lambda: None,
+        on_stopped: Callback = lambda: None,
+    ) -> None:
+        self._close_event.clear()
+
+        def _run() -> None:
+            try:
+                run(
+                    midi_port=midi_port,
+                    obs_port=obs_port,
+                    obs_password=obs_password,
+                    interactive=False,
+                    on_ready=on_ready,
+                    close_event=self._close_event,
+                )
+            except Exception as exc:
+                print("---> EXC:", exc)
+                on_error()
+            else:
+                # NOTE: we may reach this point if OBS closes the connection on their end,
+                # e.g. if OBS was closed.
+                on_stopped()
+
+        t = threading.Thread(target=_run)
+        t.daemon = True
+        t.start()
+        self._thread = t
+
+    def is_application_running(self) -> bool:
+        return self._thread is not None
+
+    def stop_application(self) -> None:
+        self._close_event.set()
+        # Don't join() to avoid blocking GUI mainloop
+        # Be confident the thread will terminate soon
+        self._thread = None
+
+
+class ConfigForm(ttk.Frame):
+    _MIDI_PORT_VIRTUAL = "<New virtual MIDI port>"
+
+    def __init__(self, main_page: MainPage) -> None:
+        super().__init__(main_page)
+        self._main_page = main_page
 
         available_midi_ports = mido.get_input_names()
+        midi_port_options = [self._MIDI_PORT_VIRTUAL, *available_midi_ports]
+        width = max((len(p) for p in midi_port_options))
 
-        self._midi_port = tk.StringVar(
-            value=available_midi_ports[0] if available_midi_ports else ""
-        )
+        # MIDI Input Port
+        self._midi_port = tk.StringVar(value=midi_port_options[0])
         self._midi_port.trace_add("write", lambda *args: self._update())
-        ttk.Label(config, text="midi-port", justify="left").grid(
-            row=0, column=0, padx=(0, 10), pady=FIELD_PADY, sticky="w"
-        )
         self._midi_port_entry = ttk.Combobox(
-            config,
+            self,
             textvariable=self._midi_port,
-            values=available_midi_ports,
+            values=midi_port_options,
         )
-        self._midi_port_entry.grid(row=0, column=1, pady=FIELD_PADY, sticky="we")
+        self._add_field(row=0, label_text="midi-port", widget=self._midi_port_entry)
 
+        # OBS Port
         self._obs_port = tk.IntVar(value=4455)
         self._obs_port.trace_add("write", lambda *args: self._update())
-        ttk.Label(config, text="obs-port", justify="left").grid(
-            row=1, column=0, padx=(0, 10), pady=FIELD_PADY, sticky="w"
-        )
         self._obs_port_entry = ttk.Entry(
-            config, width=INPUT_WIDTH, textvariable=self._obs_port
+            self,
+            textvariable=self._obs_port,
+            width=width,
         )
-        self._obs_port_entry.grid(row=1, column=1, pady=FIELD_PADY)
+        self._add_field(row=1, label_text="obs-port", widget=self._obs_port_entry)
 
+        # OBS Password
         self._obs_password = tk.StringVar()
         self._obs_password.trace_add("write", lambda *args: self._update())
-        ttk.Label(config, text="obs-password", justify="left").grid(
-            row=2, column=0, padx=(0, 10), pady=FIELD_PADY, sticky="w"
-        )
         self._obs_password_entry = ttk.Entry(
-            config, width=INPUT_WIDTH, show="*", textvariable=self._obs_password
+            self,
+            show="*",
+            textvariable=self._obs_password,
+            width=width,
         )
-        self._obs_password_entry.grid(row=2, column=1, pady=FIELD_PADY)
+        self._add_field(
+            row=2, label_text="obs-password", widget=self._obs_password_entry
+        )
 
-        self._config_widgets = [
+        self._field_widgets = [
             self._midi_port_entry,
             self._obs_port_entry,
             self._obs_password_entry,
         ]
 
+        self.grid_columnconfigure(1, weight=1)
+
         self._cta_label = tk.StringVar(value="Start")
         self._cta_button = ttk.Button(
-            config,
+            self,
             textvariable=self._cta_label,
             state=tk.DISABLED,
             command=self._on_click_cta,
         )
         self._cta_button.grid(row=3, column=0, columnspan=2)
         self._status = tk.StringVar()
-        self._status_label = ttk.Label(config, textvariable=self._status)
+        self._status_label = ttk.Label(self, textvariable=self._status)
         self._status_label.grid(row=4, column=0, columnspan=2)
 
-        footer = ttk.Frame(self, padding=(0, 10))
-        ttk.Button(footer, text="Quit", command=app.quit).pack()
-
-        header.grid(row=0, column=0, sticky="we")
-        config.grid(row=1, column=0, sticky="n")
-        footer.grid(row=2, column=0, sticky="we")
-        self.grid_rowconfigure(1, weight=1)
-        self.grid_columnconfigure(0, weight=1)
+    def _add_field(self, row: int, label_text: str, widget: ttk.Widget) -> None:
+        ttk.Label(self, text=label_text, justify="left").grid(
+            row=row, column=0, padx=(0, 10), pady=5, sticky="w"
+        )
+        widget.grid(row=row, column=1, pady=5, sticky="we")
 
     def _update(self) -> None:
         self._cta_button.config(state=tk.NORMAL if self._can_run() else tk.DISABLED)
@@ -125,12 +196,15 @@ class MainPage(ttk.Frame):
         except tk.TclError:
             return False
 
-        return bool(self._midi_port.get()) and bool(self._obs_password.get())
+        return bool(self._midi_port.get() and self._obs_password.get())
+
+    def _set_disabled(self, disabled: bool) -> None:
+        for widget in self._field_widgets:
+            widget.config(state=tk.DISABLED if disabled else tk.NORMAL)
 
     def _set_starting(self) -> None:
         self._cta_label.set("Stop")
-        for widget in self._config_widgets:
-            widget.config(state=tk.DISABLED)
+        self._set_disabled(True)
 
     def _set_running(self) -> None:
         self._status.set("Running")
@@ -141,46 +215,30 @@ class MainPage(ttk.Frame):
         self._status_label.config(foreground="red")
 
     def _set_stopped(self) -> None:
-        self._close_event.set()
-        # Don't join() to avoid blocking GUI mainloop
-        # Be confident the thread will terminate soon
-        self._thread = None
-
+        self._main_page.stop_application()
         self._cta_label.set("Start")
         self._status.set("")
         self._status_label.config(foreground="black")
-        for widget in self._config_widgets:
-            widget.config(state=tk.NORMAL)
-
-    def _run_in_thread(self) -> None:
-        try:
-            self._set_starting()
-            run(
-                midi_port=self._midi_port.get(),
-                obs_port=int(self._obs_port.get()),
-                obs_password=self._obs_password.get(),
-                on_ready=lambda: self._set_running(),
-                close_event=self._close_event,
-            )
-        except Exception:
-            self._set_error()
-        else:
-            # NOTE: we may reach this point if OBS closes the connection on their end,
-            # e.g. if OBS was closed.
-            self._set_stopped()
+        self._set_disabled(False)
 
     def _on_click_cta(self) -> None:
-        if self._thread is not None:
+        if self._main_page.is_application_running():
             self._set_stopped()
             return
 
-        self._close_event.clear()
-        t = threading.Thread(target=self._run_in_thread)
-        t.daemon = True
-        t.start()
-        self._thread = t
+        self._set_starting()
+
+        midi_port = self._midi_port.get()
+
+        self._main_page.start_application(
+            midi_port=midi_port if midi_port != self._MIDI_PORT_VIRTUAL else None,
+            obs_port=int(self._obs_port.get()),
+            obs_password=self._obs_password.get(),
+            on_ready=lambda: self._set_running(),
+            on_error=lambda: self._set_error(),
+            on_stopped=lambda: self._set_stopped(),
+        )
 
 
 if __name__ == "__main__":
-    logging.config.dictConfig(LOGGING_CONFIG)
     run_gui()

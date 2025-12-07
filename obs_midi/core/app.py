@@ -68,6 +68,6 @@ class App:
 
         for trigger, source_name, filter_name in self._source_filter_triggers:
             if trigger.matches(msg):
-                logger.info("Show filter: %s", source_name, filter_name)
+                logger.info("Show filter: %s on %s", filter_name, source_name)
                 self.client.enable_filter(source_name, filter_name)
                 return
