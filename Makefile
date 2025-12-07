@@ -3,7 +3,7 @@ ifneq (,$(wildcard ./.env))
 	export
 endif
 
-.SILENT: input_ports run
+.PHONY: dist
 
 all: install dist
 
@@ -21,9 +21,6 @@ check:
 format:
 	venv/bin/ruff check --select I --fix
 	venv/bin/ruff format
-
-input_ports:
-	venv/bin/python -c "import mido; print(*mido.get_input_names(), sep='\n')"
 
 run:
 	venv/bin/python -m obs_midi.gui ${ARGS}

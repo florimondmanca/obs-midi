@@ -94,8 +94,7 @@ class MainPage(ttk.Frame):
                     on_ready=on_ready,
                     close_event=self._close_event,
                 )
-            except Exception as exc:
-                print("---> EXC:", exc)
+            except Exception:
                 on_error()
             else:
                 # NOTE: we may reach this point if OBS closes the connection on their end,
