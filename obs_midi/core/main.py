@@ -87,9 +87,14 @@ def run(
                 thread.join()
 
         midi_ready_event.wait()
-        initial_obs_query.get()
+        initial_obs_query.send()
 
         try:
+            while not initial_obs_query.is_done():
+                time.sleep(0.2)
+
+            on_ready()
+
             while all(t.is_alive() for t in threads):
                 time.sleep(0.2)
 

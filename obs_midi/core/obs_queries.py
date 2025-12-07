@@ -23,10 +23,13 @@ class InitialOBSQuery:
         self._on_scene_trigger = on_scene_trigger
         self._on_source_filter_trigger = on_source_filter_trigger
         self._done_event = threading.Event()
+        self._request_ids: set[str] = set()
 
-    def get(self) -> None:
-        self._client.send_request("GetSceneList")
-        self._done_event.wait()
+    def send(self) -> None:
+        self._request_ids.add(self._client.send_request("GetSceneList"))
+
+    def is_done(self) -> bool:
+        return self._client.has_received_response_for_requests(self._request_ids)
 
     def handle_event(self, event: dict) -> None:
         if not self._client.is_request_response(event):
@@ -41,15 +44,19 @@ class InitialOBSQuery:
                         self._on_scene_trigger((cc, scene_name))
                         logger.info("Detected scene trigger: %s", scene_name)
 
-                    self._client.send_request(
-                        "GetSceneItemList", {"sceneName": scene_name}
+                    self._request_ids.add(
+                        self._client.send_request(
+                            "GetSceneItemList", {"sceneName": scene_name}
+                        )
                     )
 
             case "GetSceneItemList":
                 for data in event["d"]["responseData"]["sceneItems"]:
-                    self._client.send_request(
-                        "GetSourceFilterList",
-                        {"sourceName": data["sourceName"]},
+                    self._request_ids.add(
+                        self._client.send_request(
+                            "GetSourceFilterList",
+                            {"sourceName": data["sourceName"]},
+                        )
                     )
 
             case "GetSourceFilterList":
@@ -62,3 +69,5 @@ class InitialOBSQuery:
                     if (cc := ControlChange.parse_at_end_of(filter_name)) is not None:
                         self._on_source_filter_trigger((cc, source_name, filter_name))
                         logger.info("Detected filter trigger: %s", filter_name)
+
+                self._done_event.set()

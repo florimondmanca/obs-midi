@@ -26,6 +26,7 @@ class ObsClient:
     def __init__(self, ws: websockets.sync.connection.Connection) -> None:
         self._ws = ws
         self._request_data_entries: dict[str, dict] = {}
+        self._request_ids_with_response: set[str] = set()
 
     def __enter__(self) -> "ObsClient":
         return self
@@ -64,7 +65,16 @@ class ObsClient:
                 continue
 
             event = json.loads(message)
+
+            if self.is_request_response(event):
+                self._request_ids_with_response.add(event["d"]["requestId"])
+
             yield event
+
+    def has_received_response_for_requests(self, request_ids: set[str]) -> bool:
+        return all(
+            request_id in self._request_ids_with_response for request_id in request_ids
+        )
 
     def get_request_data(self, request_id: str) -> dict:
         return self._request_data_entries.get(request_id, {})
@@ -72,7 +82,7 @@ class ObsClient:
     def is_request_response(self, event: dict) -> bool:
         return event["op"] == 7 and event["d"].get("requestStatus", {}).get("result")
 
-    def send_request(self, request_type: str, request_data: dict | None = None) -> None:
+    def send_request(self, request_type: str, request_data: dict | None = None) -> str:
         # https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md#getscenelist
         request_id = str(uuid.uuid4())
 
@@ -89,6 +99,8 @@ class ObsClient:
             self._request_data_entries[request_id] = request_data
 
         self._ws.send(json.dumps(msg))
+
+        return request_id
 
     def set_current_program_scene(self, name: str) -> None:
         # https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md#setcurrentscenecollection
