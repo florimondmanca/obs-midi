@@ -7,8 +7,6 @@ from typing import Any, Callable
 import mido
 from rtmidi.midiutil import open_midiinput
 
-from .app import App
-
 logger = logging.getLogger(__name__)
 
 
@@ -16,7 +14,6 @@ class MIDInputThread(threading.Thread):
     def __init__(
         self,
         *,
-        app: App,
         port: str | None,
         interactive: bool,
         on_error: Callable[[Exception], None] = lambda exc: None,
@@ -26,12 +23,15 @@ class MIDInputThread(threading.Thread):
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-        self._app = app
         self._port = port
         self._interactive = interactive
         self._ready_event = ready_event
         self._close_event = close_event
         self._error_bucket = error_bucket
+        self._message_handlers: list[Callable[[mido.Message], None]] = []
+
+    def add_message_handler(self, cb: Callable[[mido.Message], None]) -> None:
+        self._message_handlers.append(cb)
 
     def run(
         self,
@@ -54,7 +54,8 @@ class MIDInputThread(threading.Thread):
                     msg_bytes, _ = event
                     msg: mido.Message = mido.parse(msg_bytes)
                     logger.debug("Incoming message: %s", msg)
-                    self._app.on_midi_message(msg)
+                    for handle_message in self._message_handlers:
+                        handle_message(msg)
                 except Exception as exc:
                     logger.error(exc)
                     raise

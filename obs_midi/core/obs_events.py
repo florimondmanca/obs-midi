@@ -1,11 +1,11 @@
 import logging
 import threading
-from typing import Any
+from typing import Any, Callable
 
 import websockets
 import websockets.sync.client
 
-from .app import App
+from .obs_client import ObsClient
 
 logger = logging.getLogger(__name__)
 
@@ -14,36 +14,37 @@ class ObsEventsThread(threading.Thread):
     def __init__(
         self,
         *,
-        app: App,
+        client: ObsClient,
         start_event: threading.Event,
         close_event: threading.Event,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-        self._app = app
-        self.start_event = start_event
+        self._client = client
+        self._start_event = start_event
         self._close_event = close_event
+        self._event_handlers: list[Callable[[dict], None]] = []
+
+    def add_event_handler(self, cb: Callable[[dict], None]) -> None:
+        self._event_handlers.append(cb)
 
     def run(
         self,
     ) -> None:
-        self.start_event.wait()
-
-        client = self._app.client
+        self._start_event.wait()
 
         try:
             logger.info("Started")
 
-            for event in client.iter_events():
+            for event in self._client.iter_events():
                 if self._close_event.is_set():
                     break
 
                 if event is None:
                     continue
 
-                if client.is_request_response(event):
-                    request_data = client.get_request_data(event["d"]["requestId"])
-                    self._app.on_response(event, request_data)
+                for handle_event in self._event_handlers:
+                    handle_event(event)
 
             logger.info("Stopped")
         except websockets.exceptions.ConnectionClosed:
