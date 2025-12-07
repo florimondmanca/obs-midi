@@ -8,7 +8,7 @@ As of December 2025, OBS does not have native MIDI control.
 
 The most popular option is the [obs-midi-mg](https://github.com/nhielost/obs-midi-mg) plugin, but it has issues with latest OBS versions and tends to eat up a lot of CPU while listening for MIDI messages.
 
-Instead, OBS MIDI relies on the native WebSocket remote control capability of OBS and the well-establiedh `python-rtmidi` library, which should make for a future-proof solution.
+Instead, OBS MIDI relies on the native WebSocket remote control capability of OBS and the well-established `python-rtmidi` library, which should make for a future-proof solution.
 
 ## Disclaimer
 
