@@ -56,15 +56,14 @@ class MainApplication:
 
 class MainPage(ttk.Frame):
     def __init__(self, parent: ttk.Frame, app: MainApplication) -> None:
-        super().__init__(parent)
+        super().__init__(parent, padding=30)
 
         self._thread: threading.Thread | None = None
         self._close_event = threading.Event()
 
         config_form = ConfigForm(self)
-        config_form.config(padding=30)
 
-        footer = ttk.Frame(self, padding=30)
+        footer = ttk.Frame(self, padding=(0, 30, 0, 0))
         ttk.Button(footer, text="Quit", command=app.quit).pack()
 
         config_form.grid(row=0, column=0, sticky="n")
@@ -166,19 +165,23 @@ class ConfigForm(ttk.Frame):
             self._obs_password_entry,
         ]
 
-        self.grid_columnconfigure(1, weight=1)
+        cta_frame = ttk.Frame(self, padding=10)
 
         self._cta_label = tk.StringVar(value="Start")
         self._cta_button = ttk.Button(
-            self,
+            cta_frame,
             textvariable=self._cta_label,
             state=tk.DISABLED,
             command=self._on_click_cta,
         )
-        self._cta_button.grid(row=3, column=0, columnspan=2)
+        self._cta_button.grid(row=0, column=0)
         self._status = tk.StringVar()
-        self._status_label = ttk.Label(self, textvariable=self._status)
-        self._status_label.grid(row=4, column=0, columnspan=2)
+        self._status_label = ttk.Label(cta_frame, textvariable=self._status)
+        self._status_label.grid(row=1, column=0)
+
+        cta_frame.grid(row=3, column=0, columnspan=2)
+
+        self.grid_columnconfigure(1, weight=1)
 
     def _add_field(self, row: int, label_text: str, widget: ttk.Widget) -> None:
         ttk.Label(self, text=label_text, justify="left").grid(
