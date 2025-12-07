@@ -14,7 +14,12 @@ FIELD_PADY = 5
 
 
 def run_gui() -> None:
-    root = ThemedTk(theme="yaru")
+    root = ThemedTk(
+        theme="yaru",
+        # This should match the StartupWMClass in 'obs-midi.desktop' so that
+        # under Linux, X server knows to group the tkinter window with the launcher icon.
+        className="obs-midi",
+    )
     root.title("python-obs-midi")
     MainApplication(root)
     root.mainloop()

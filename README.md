@@ -1,36 +1,32 @@
-# python-obs-midi
+# OBS MIDI
 
-A bridge to control [OBS](https://obsproject.com/) using MIDI, powered by OBS' native [WebSocket Remote Control](https://obsproject.com/kb/remote-control-guide).
+A bridge to control [OBS](https://obsproject.com/) using MIDI, powered by the native [WebSocket Remote Control](https://obsproject.com/kb/remote-control-guide) capabilities of OBS.
 
 ## Why?
 
 As of December 2025, OBS does not have native MIDI control.
 
-The most popular option is the [obs-midi-mg](https://github.com/nhielost/obs-midi-mg) plugin.
+The most popular option is the [obs-midi-mg](https://github.com/nhielost/obs-midi-mg) plugin, but it has issues with latest OBS versions and tends to eat up a lot of CPU while listening for MIDI messages.
 
-But maintenance has stalled and I was not able to make it work on latest OBS versions (v31+).
-
-Besides, in my setup running this plugin eats up a lot of CPU. This appears to be due to inefficient MIDI polling performed by `libremidi`.
-
-`python-obs-midi` relies on the native WebSocket remote control capability of OBS (which should be more future-proof), and on `python-rtmidi`, a well-established and performant MIDI library for Python.
+Instead, OBS MIDI relies on the native WebSocket remote control capability of OBS and the well-establiedh `python-rtmidi` library, which should make for a future-proof solution.
 
 ## Disclaimer
 
-I develop this software for my own use, which is using OBS as a video clip playback solution for live music gigs.
-
 There is no maintenance intended, but I would be happy for this code to be reused and tweaked by others.
+
+I initially developed this software for my own use, i.e. using OBS as a video clip playback solution for live music gigs.
 
 ## Features
 
-- Cross-platform (hopefully so, but developed primarily on Linux Mint).
-- Supports scene switching and filter toggling.
-- Define MIDI triggers directly in scene or filter names, making the configuration visible and always in-sync with your OBS session.
+- Nice and simple GUI program
+- Cross-platform (although primarily tested on Linux Mint)
+- Actions: scene switching, filter toggling
+- WYSIWYG configuration: define MIDI triggers directly in scene or filter names.
 
 Limitations:
 
-- Requires a working Python environment to run.
-- Only MIDI CC is supported for now.
-- GUI is very basic.
+- Requires a working Python environment to package from source.
+- Only MIDI CC can be used as triggers, for now.
 
 ## Requirements
 
@@ -40,19 +36,23 @@ Limitations:
 
 ## Installation
 
-Download a copy of the source code, either via git by cloning this repo, or by downloading the ZIP archive.
-
-Then open a terminal at the root of the source code folder, and run `make install`.
-
-## Configuration
-
-Launch OBS, then enable and configure the WebSocket server. See [official docs](https://obsproject.com/kb/remote-control-guide) for more info.
+1. Download a copy of the source code, either via git by cloning this repo, or by downloading the ZIP archive.
+2. Open a terminal at the root of the source code directory.
+3. Run `make` to install dependencies and build the executable file.
+  * On Linux: this will also ask to install and create a desktop entry. You can then find the "OBS MIDI" program in the desktop menu, as well as the `obs-midi` command in the terminal.
+  * For other operating systems: this will create the executable program at `dist/obs-midi`. It can be run by double-clicking on it, and you can place it wherever you'd like on your computer.
 
 ## Usage
 
+## Configuring OBS
+
+Launch OBS, then enable and configure the WebSocket server -- mainly setting the port and password.
+
+See [official docs](https://obsproject.com/kb/remote-control-guide) for more info.
+
 ### Configuring MIDI triggers
 
-`python-obs-midi` reads MIDI triggers directly from scene and filter names. This ensures the MIDI configuration is always in sync and visible in your OBS session.
+OBS MIDI reads MIDI triggers directly from scene and filter names. This ensures the MIDI configuration is always in sync and visible in your OBS session.
 
 For MIDI CC, the format should be:
 
@@ -74,11 +74,13 @@ then receiving MIDI CC 20 with value 127 on channel 3 will make OBS switch to th
 
 Plug your MIDI interface into your computer
 
-Then open a terminal at the root of the source code folder, and run: `make run`
+Then start the "OBS MIDI" program (Linux) or (for all operating systems) the compiled `obs-midi` program.
 
 Select the MIDI port to use, enter the configured OBS WebSocket port and password, then click "Start".
 
 ### Running via the command line interface (CLI) (Advanced)
+
+_**TODO**: this section is obsolete._
 
 The program may also be run from the terminal via a traditional CLI.
 
@@ -99,10 +101,6 @@ For convenience, you can define these environment variables in a local `.env` fi
 Install additional development dependencies using `make install_dev`.
 
 See the `Makefile` for additional development commands such as `format` and `check`.
-
-OBS has native WebSocket support. Its [protocol](github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md) provides an extended set of operations for controlling an OBS session.
-
-As such, I hope building MIDI control on top of this native WebSocket capability should be fairly future-proof.
 
 ## License
 

@@ -1,4 +1,8 @@
+# Runtime dependencies
 python-rtmidi==1.5.*
 mido==1.3.*
 websockets==15.*
 ttkthemes==3.3.*
+
+# Packaging
+pyinstaller

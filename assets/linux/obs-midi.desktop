@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Terminal=false
+Name=OBS MIDI
+Exec=bash -c "~/.local/bin/obs-midi"
+Icon=obs-midi
+StartupWMClass=obs-midi

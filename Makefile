@@ -5,7 +5,7 @@ endif
 
 .SILENT: input_ports run
 
-all: run
+all: install dist
 
 install:
 	python3 -m venv venv
@@ -25,5 +25,8 @@ format:
 input_ports:
 	venv/bin/python -c "import mido; print(*mido.get_input_names(), sep='\n')"
 
-run:
-	venv/bin/python main.py --gui
+dist:
+	venv/bin/python -m obs_midi.packaging.build
+
+clean:
+	rm -r dist
