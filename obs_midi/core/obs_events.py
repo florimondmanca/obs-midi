@@ -1,4 +1,5 @@
 import logging
+import queue
 import threading
 from typing import Any, Callable
 
@@ -17,12 +18,14 @@ class ObsEventsThread(threading.Thread):
         client: ObsClient,
         start_event: threading.Event,
         close_event: threading.Event,
+        error_bucket: queue.Queue[Exception],
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self._client = client
         self._start_event = start_event
         self._close_event = close_event
+        self._error_bucket = error_bucket
         self._event_handlers: list[Callable[[dict], None]] = []
 
     def add_event_handler(self, cb: Callable[[dict], None]) -> None:
@@ -47,10 +50,7 @@ class ObsEventsThread(threading.Thread):
                     handle_event(event)
 
             logger.info("Stopped")
-        except websockets.exceptions.ConnectionClosed:
-            logger.info("OBS WebSocket connection was closed, stopping...")
-            self._close_event.set()
-            return
         except Exception as exc:
             logger.error(exc)
+            self._error_bucket.put_nowait(exc)
             raise

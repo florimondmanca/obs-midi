@@ -9,7 +9,7 @@ import mido
 
 from .midi import MIDITrigger
 from .midi_in import MIDInputThread
-from .obs_client import open_obs_client
+from .obs_client import ObsDisconnect, open_obs_client
 from .obs_events import ObsEventsThread
 from .obs_queries import InitialOBSQuery
 
@@ -69,6 +69,7 @@ def run(
             client=client,
             start_event=midi_ready_event,
             close_event=close_event,
+            error_bucket=error_bucket,
             daemon=True,
         )
         obs_events_thread.add_event_handler(initial_obs_query.handle_event)
@@ -107,6 +108,8 @@ def run(
                 pass
             else:
                 raise exc
+        except ObsDisconnect:
+            raise
         except KeyboardInterrupt:
             print("Exiting...")
         finally:

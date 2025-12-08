@@ -9,9 +9,8 @@ import mido
 from ttkthemes import ThemedTk
 
 from .core.main import run
+from .core.obs_client import ObsDisconnect
 from .logging import LOGGING_CONFIG
-
-Callback = Callable[[], None]
 
 
 def run_gui() -> None:
@@ -77,9 +76,9 @@ class MainPage(ttk.Frame):
         midi_port: str | None,
         obs_port: int,
         obs_password: str,
-        on_ready: Callback = lambda: None,
-        on_error: Callback = lambda: None,
-        on_stopped: Callback = lambda: None,
+        on_ready: Callable[[], None] = lambda: None,
+        on_error: Callable[[Exception], None] = lambda exc: None,
+        on_stopped: Callable[[], None] = lambda: None,
     ) -> None:
         self._close_event.clear()
 
@@ -93,8 +92,8 @@ class MainPage(ttk.Frame):
                     on_ready=on_ready,
                     close_event=self._close_event,
                 )
-            except Exception:
-                on_error()
+            except Exception as exc:
+                on_error(exc)
             else:
                 # NOTE: we may reach this point if OBS closes the connection on their end,
                 # e.g. if OBS was closed.
@@ -212,9 +211,13 @@ class ConfigForm(ttk.Frame):
         self._status.set("Running")
         self._status_label.config(foreground="green")
 
-    def _set_error(self) -> None:
+    def _set_error(self, exc: Exception) -> None:
         self._status.set("Error")
         self._status_label.config(foreground="red")
+
+        if isinstance(exc, ObsDisconnect):
+            self._status.set("Error. Reconnecting...")
+            # TODO: actually reconnect after some time
 
     def _set_stopped(self) -> None:
         self._main_page.stop_application()
@@ -237,7 +240,7 @@ class ConfigForm(ttk.Frame):
             obs_port=int(self._obs_port.get()),
             obs_password=self._obs_password.get(),
             on_ready=lambda: self._set_running(),
-            on_error=lambda: self._set_error(),
+            on_error=lambda exc: self._set_error(exc),
             on_stopped=lambda: self._set_stopped(),
         )
 

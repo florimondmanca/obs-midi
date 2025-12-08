@@ -3,19 +3,47 @@ import hashlib
 import json
 import logging
 import uuid
-from typing import Any, Iterator
+from contextlib import contextmanager
+from typing import Iterator
 
 import websockets
-import websockets.sync.connection
+from websockets.sync.client import Connection, connect
 
 logger = logging.getLogger(__name__)
 
 
-def open_obs_client(port: int, password: str) -> "ObsClient":
-    ws = websockets.sync.client.connect(f"ws://localhost:{port}")
-    client = ObsClient(ws)
-    client.authenticate(password)
-    return client
+class ObsDisconnect(Exception):
+    pass
+
+
+@contextmanager
+def open_obs_client(port: int, password: str) -> Iterator["ObsClient"]:
+    with connect(f"ws://localhost:{port}") as ws:
+        _obs_authenticate(ws, password)
+        yield ObsClient(ws)
+
+
+def _obs_authenticate(ws: Connection, password: str) -> None:
+    server_hello = json.loads(ws.recv())
+
+    secret = base64.b64encode(
+        hashlib.sha256(
+            (password + server_hello["d"]["authentication"]["salt"]).encode()
+        ).digest()
+    )
+
+    auth = base64.b64encode(
+        hashlib.sha256(
+            secret + server_hello["d"]["authentication"]["challenge"].encode()
+        ).digest()
+    ).decode()
+
+    payload = {
+        "op": 1,
+        "d": {"rpcVersion": 1, "authentication": auth},
+    }
+
+    ws.send(json.dumps(payload))
 
 
 class ObsClient:
@@ -28,43 +56,29 @@ class ObsClient:
         self._request_data_entries: dict[str, dict] = {}
         self._request_ids_with_response: set[str] = set()
 
-    def __enter__(self) -> "ObsClient":
-        return self
+    def _recv(self, timeout: float) -> str | bytes:
+        try:
+            return self._ws.recv(timeout)
+        except TimeoutError:
+            return ""
+        except websockets.ConnectionClosed:
+            raise ObsDisconnect()
 
-    def __exit__(self, *args: Any) -> None:
-        return self._ws.__exit__(*args)
-
-    def authenticate(self, password: str) -> None:
-        server_hello = json.loads(self._ws.recv())
-
-        secret = base64.b64encode(
-            hashlib.sha256(
-                (password + server_hello["d"]["authentication"]["salt"]).encode()
-            ).digest()
-        )
-
-        auth = base64.b64encode(
-            hashlib.sha256(
-                secret + server_hello["d"]["authentication"]["challenge"].encode()
-            ).digest()
-        ).decode()
-
-        payload = {
-            "op": 1,
-            "d": {"rpcVersion": 1, "authentication": auth},
-        }
-
-        self._ws.send(json.dumps(payload))
+    def _send(self, msg: str) -> None:
+        try:
+            self._ws.send(msg)
+        except websockets.ConnectionClosed:
+            raise ObsDisconnect()
 
     def iter_events(self) -> Iterator[dict | None]:
         while True:
-            try:
-                message = self._ws.recv(timeout=0.2)
-            except TimeoutError:
+            msg = self._recv(timeout=0.2)
+
+            if not msg:
                 yield None
                 continue
 
-            event = json.loads(message)
+            event = json.loads(msg)
 
             if self.is_request_response(event):
                 self._request_ids_with_response.add(event["d"]["requestId"])
@@ -98,7 +112,7 @@ class ObsClient:
             msg["d"]["requestData"] = request_data
             self._request_data_entries[request_id] = request_data
 
-        self._ws.send(json.dumps(msg))
+        self._send(json.dumps(msg))
 
         return request_id
 
@@ -115,7 +129,7 @@ class ObsClient:
             },
         }
 
-        self._ws.send(json.dumps(msg))
+        self._send(json.dumps(msg))
 
     def enable_filter(self, source: str, filtername: str) -> None:
         # https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md#setsourcefilterenabled
@@ -132,4 +146,4 @@ class ObsClient:
             },
         }
 
-        self._ws.send(json.dumps(msg))
+        self._send(json.dumps(msg))
