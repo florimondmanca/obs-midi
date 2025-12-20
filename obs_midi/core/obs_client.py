@@ -2,6 +2,7 @@ import base64
 import hashlib
 import json
 import logging
+import sys
 import uuid
 from contextlib import contextmanager
 from typing import Iterator
@@ -18,32 +19,13 @@ class ObsDisconnect(Exception):
 
 @contextmanager
 def open_obs_client(port: int, password: str) -> Iterator["ObsClient"]:
-    with connect(f"ws://localhost:{port}") as ws:
-        _obs_authenticate(ws, password)
-        yield ObsClient(ws)
+    client = ObsClient(port=port, password=password)
 
-
-def _obs_authenticate(ws: Connection, password: str) -> None:
-    server_hello = json.loads(ws.recv())
-
-    secret = base64.b64encode(
-        hashlib.sha256(
-            (password + server_hello["d"]["authentication"]["salt"]).encode()
-        ).digest()
-    )
-
-    auth = base64.b64encode(
-        hashlib.sha256(
-            secret + server_hello["d"]["authentication"]["challenge"].encode()
-        ).digest()
-    ).decode()
-
-    payload = {
-        "op": 1,
-        "d": {"rpcVersion": 1, "authentication": auth},
-    }
-
-    ws.send(json.dumps(payload))
+    try:
+        client.connect()
+        yield client
+    finally:
+        client.close()
 
 
 class ObsClient:
@@ -51,23 +33,78 @@ class ObsClient:
 
     REQUEST_GET_SCENE_LIST = "GetSceneList"
 
-    def __init__(self, ws: websockets.sync.connection.Connection) -> None:
-        self._ws = ws
+    def __init__(self, port: int, password: str) -> None:
+        self._port = port
+        self._password = password
+        self._ws: Connection | None = None
         self._request_data_entries: dict[str, dict] = {}
         self._request_ids_with_response: set[str] = set()
 
-    def _recv(self, timeout: float) -> str | bytes:
+    def connect(self) -> None:
+        assert self._ws is None, "Already connected"
+        self._ws = connect(f"ws://localhost:{self._port}")
+        self._authenticate()
+
+    def reconnect(self) -> None:
+        if self._ws is not None:
+            self._ws.close()
+            self._ws = None
+
+        self.connect()
+
+    def close(self) -> None:
+        if self._ws is None:
+            return
+
+        exc_name, exc, _ = sys.exc_info()
+        close_code = (
+            websockets.CloseCode.NORMAL_CLOSURE
+            if exc is None
+            else websockets.CloseCode.INTERNAL_ERROR
+        )
+        self._ws.close(close_code)
+        self._ws = None
+
+    def _authenticate(self) -> None:
+        server_hello = json.loads(self._recv(None))
+
+        secret = base64.b64encode(
+            hashlib.sha256(
+                (self._password + server_hello["d"]["authentication"]["salt"]).encode()
+            ).digest()
+        )
+
+        auth = base64.b64encode(
+            hashlib.sha256(
+                secret + server_hello["d"]["authentication"]["challenge"].encode()
+            ).digest()
+        ).decode()
+
+        payload = {
+            "op": 1,
+            "d": {"rpcVersion": 1, "authentication": auth},
+        }
+
+        self._send(json.dumps(payload))
+
+    def _recv(self, timeout: float | None) -> str | bytes:
+        assert self._ws is not None, "Not connected"
+
         try:
             return self._ws.recv(timeout)
         except TimeoutError:
             return ""
         except websockets.ConnectionClosed:
+            self._ws = None
             raise ObsDisconnect()
 
     def _send(self, msg: str) -> None:
+        assert self._ws is not None, "Not connected"
+
         try:
             self._ws.send(msg)
         except websockets.ConnectionClosed:
+            self._ws = None
             raise ObsDisconnect()
 
     def iter_events(self) -> Iterator[dict | None]:

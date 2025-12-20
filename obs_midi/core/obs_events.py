@@ -1,12 +1,10 @@
 import logging
 import queue
 import threading
+import time
 from typing import Any, Callable
 
-import websockets
-import websockets.sync.client
-
-from .obs_client import ObsClient
+from .obs_client import ObsClient, ObsDisconnect
 
 logger = logging.getLogger(__name__)
 
@@ -27,30 +25,54 @@ class ObsEventsThread(threading.Thread):
         self._close_event = close_event
         self._error_bucket = error_bucket
         self._event_handlers: list[Callable[[dict], None]] = []
+        self._reconnect_delay = 1
 
     def add_event_handler(self, cb: Callable[[dict], None]) -> None:
         self._event_handlers.append(cb)
+
+    def _reconnect(self) -> None:
+        while True:
+            logger.warn(
+                "Reconnecting in %s seconds...",
+                self._reconnect_delay,
+            )
+
+            time.sleep(self._reconnect_delay)
+
+            try:
+                self._client.reconnect()
+            except ConnectionError:
+                continue
+            else:
+                break
 
     def run(
         self,
     ) -> None:
         self._start_event.wait()
 
-        try:
-            logger.info("Started")
+        while True:
+            try:
+                logger.info("Started")
 
-            for event in self._client.iter_events():
-                if self._close_event.is_set():
-                    break
+                for event in self._client.iter_events():
+                    if self._close_event.is_set():
+                        return
 
-                if event is None:
-                    continue
+                    if event is None:
+                        continue
 
-                for handle_event in self._event_handlers:
-                    handle_event(event)
+                    for handle_event in self._event_handlers:
+                        handle_event(event)
 
-            logger.info("Stopped")
-        except Exception as exc:
-            logger.error(exc)
-            self._error_bucket.put_nowait(exc)
-            raise
+                logger.info("Stopped")
+                break
+            except ObsDisconnect:
+                logger.warn("OBS disconnected.")
+                self._reconnect()
+                continue
+            except Exception as exc:
+                logger.error(exc)
+                self._close_event.set()
+                self._error_bucket.put_nowait(exc)
+                raise

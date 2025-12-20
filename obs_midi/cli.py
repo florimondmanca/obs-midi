@@ -59,7 +59,7 @@ def run_cli() -> None:
         if log_level == logging.DEBUG:
             logger.exception(exc)
         else:
-            logger.error(exc)
+            logger.error("Application error: %s", exc)
 
         raise SystemExit(1)
 

@@ -22,8 +22,11 @@ format:
 	venv/bin/ruff check --select I --fix
 	venv/bin/ruff format
 
-run:
-	venv/bin/python -m obs_midi.gui ${ARGS}
+cli:
+	venv/bin/python -m obs_midi.cli ${ARGS}
+
+gui:
+	venv/bin/python -m obs_midi.cli ${ARGS}
 
 dist:
 	venv/bin/python -m obs_midi.packaging.build

@@ -9,7 +9,7 @@ import mido
 
 from .midi import MIDITrigger
 from .midi_in import MIDInputThread
-from .obs_client import ObsDisconnect, open_obs_client
+from .obs_client import open_obs_client
 from .obs_events import ObsEventsThread
 from .obs_queries import InitialOBSQuery
 
@@ -82,35 +82,50 @@ def run(
         for thread in threads:
             thread.start()
 
-        def close_all_threads() -> None:
-            close_event.set()
-            for thread in threads:
-                thread.join()
-
-        midi_ready_event.wait()
-        initial_obs_query.send()
-
-        try:
-            while not initial_obs_query.is_done():
-                time.sleep(0.2)
-
-            on_ready()
-
-            while all(t.is_alive() for t in threads):
-                time.sleep(0.2)
-
-                if close_event.is_set():
-                    break
-
+        def flush_error_bucket() -> None:
             try:
                 exc = error_bucket.get_nowait()
             except queue.Empty:
                 pass
             else:
                 raise exc
-        except ObsDisconnect:
-            raise
+
+        def close_all_threads() -> None:
+            close_event.set()
+            for thread in threads:
+                thread.join()
+
+        try:
+            midi_ready_event.wait()
+
+            if not all(t.is_alive() for t in threads):
+                flush_error_bucket()
+                return
+
+            initial_obs_query.send()
+
+            while not initial_obs_query.is_done():
+                time.sleep(0.2)
+
+            if not all(t.is_alive() for t in threads):
+                flush_error_bucket()
+                return
+
+            on_ready()
+
+            while True:
+                if not all(t.is_alive() for t in threads):
+                    flush_error_bucket()
+                    return
+
+                time.sleep(0.2)
+
+                if close_event.is_set():
+                    flush_error_bucket()
+                    return
         except KeyboardInterrupt:
-            print("Exiting...")
+            logger.info("Exiting...")
+        except Exception:
+            raise
         finally:
             close_all_threads()
