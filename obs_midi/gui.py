@@ -9,8 +9,9 @@ import mido
 from ttkthemes import ThemedTk
 
 from .core.main import run
-from .core.obs_client import ObsDisconnect
 from .logging import LOGGING_CONFIG
+
+logger = logging.getLogger(__name__)
 
 
 def run_gui() -> None:
@@ -77,12 +78,18 @@ class MainPage(ttk.Frame):
         obs_port: int,
         obs_password: str,
         on_ready: Callable[[], None] = lambda: None,
+        on_obs_disconnect: Callable[[], None] = lambda: None,
+        on_obs_reconnect: Callable[[], None] = lambda: None,
         on_error: Callable[[Exception], None] = lambda exc: None,
         on_stopped: Callable[[], None] = lambda: None,
     ) -> None:
+        assert not self.is_application_running(), "Application is already running"
+
         self._close_event.clear()
 
         def _run() -> None:
+            logger.info("Application thread has started")
+
             try:
                 run(
                     midi_port=midi_port,
@@ -90,15 +97,20 @@ class MainPage(ttk.Frame):
                     obs_password=obs_password,
                     interactive=False,
                     on_ready=on_ready,
+                    on_obs_disconnect=on_obs_disconnect,
+                    on_obs_reconnect=on_obs_reconnect,
                     close_event=self._close_event,
                 )
             except Exception as exc:
+                logger.error("Application returned an error: %s", repr(exc))
                 on_error(exc)
             else:
                 # NOTE: we may reach this point if OBS closes the connection on their end,
                 # e.g. if OBS was closed.
+                logger.info("Application has stopped")
                 on_stopped()
 
+        logger.info("Starting application thread")
         t = threading.Thread(target=_run)
         t.daemon = True
         t.start()
@@ -108,6 +120,7 @@ class MainPage(ttk.Frame):
         return self._thread is not None
 
     def stop_application(self) -> None:
+        assert self.is_application_running(), "Application is not running"
         self._close_event.set()
         # Don't join() to avoid blocking GUI mainloop
         # Be confident the thread will terminate soon
@@ -211,13 +224,13 @@ class ConfigForm(ttk.Frame):
         self._status.set("Running")
         self._status_label.config(foreground="green")
 
+    def _set_disconnected(self) -> None:
+        self._status.set("OBS disconnected. Reconnecting...")
+        self._status_label.config(foreground="darkorange")
+
     def _set_error(self, exc: Exception) -> None:
         self._status.set("Error")
         self._status_label.config(foreground="red")
-
-        if isinstance(exc, ObsDisconnect):
-            self._status.set("Error. Reconnecting...")
-            # TODO: actually reconnect after some time
 
     def _set_stopped(self) -> None:
         self._main_page.stop_application()
@@ -240,6 +253,8 @@ class ConfigForm(ttk.Frame):
             obs_port=int(self._obs_port.get()),
             obs_password=self._obs_password.get(),
             on_ready=lambda: self._set_running(),
+            on_obs_disconnect=lambda: self._set_disconnected(),
+            on_obs_reconnect=lambda: self._set_running(),
             on_error=lambda exc: self._set_error(exc),
             on_stopped=lambda: self._set_stopped(),
         )

@@ -17,6 +17,8 @@ class ObsEventsThread(threading.Thread):
         start_event: threading.Event,
         close_event: threading.Event,
         error_bucket: queue.Queue[Exception],
+        on_disconnect: Callable[[], None],
+        on_reconnect: Callable[[], None],
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -24,8 +26,10 @@ class ObsEventsThread(threading.Thread):
         self._start_event = start_event
         self._close_event = close_event
         self._error_bucket = error_bucket
-        self._event_handlers: list[Callable[[dict], None]] = []
+        self._on_disconnect = on_disconnect
+        self._on_reconnect = on_reconnect
         self._reconnect_delay = 1
+        self._event_handlers: list[Callable[[dict], None]] = []
 
     def add_event_handler(self, cb: Callable[[dict], None]) -> None:
         self._event_handlers.append(cb)
@@ -38,6 +42,9 @@ class ObsEventsThread(threading.Thread):
             )
 
             time.sleep(self._reconnect_delay)
+
+            if self._close_event.is_set():
+                break
 
             try:
                 self._client.reconnect()
@@ -69,7 +76,9 @@ class ObsEventsThread(threading.Thread):
                 break
             except ObsDisconnect:
                 logger.warn("OBS disconnected.")
+                self._on_disconnect()
                 self._reconnect()
+                self._on_reconnect()
                 continue
             except Exception as exc:
                 logger.error(exc)

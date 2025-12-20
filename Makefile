@@ -26,7 +26,7 @@ cli:
 	venv/bin/python -m obs_midi.cli ${ARGS}
 
 gui:
-	venv/bin/python -m obs_midi.cli ${ARGS}
+	venv/bin/python -m obs_midi.gui ${ARGS}
 
 dist:
 	venv/bin/python -m obs_midi.packaging.build

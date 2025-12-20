@@ -34,19 +34,10 @@ def run_cli() -> None:
         env_var="OBS_PASSWORD",
         help="obs-websocket password",
     )
-    parser.add_argument(
-        "--log-level",
-        action=EnvDefault,
-        env_var="LOG_LEVEL",
-        required=False,
-        help="Logging level",
-    )
 
     args = parser.parse_args()
 
-    if args.log_level is not None:
-        log_level = getattr(logging, args.log_level.upper())
-        logging.getLogger("obs_midi").setLevel(log_level)
+    logging.config.dictConfig(LOGGING_CONFIG)
 
     try:
         run(
@@ -56,14 +47,9 @@ def run_cli() -> None:
             interactive=True,
         )
     except Exception as exc:
-        if log_level == logging.DEBUG:
-            logger.exception(exc)
-        else:
-            logger.error("Application error: %s", exc)
-
+        logger.error(exc)
         raise SystemExit(1)
 
 
 if __name__ == "__main__":
-    logging.config.dictConfig(LOGGING_CONFIG)
     run_cli()

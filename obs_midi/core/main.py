@@ -23,6 +23,8 @@ def run(
     *,
     interactive: bool,
     on_ready: Callable[[], None] = lambda: None,
+    on_obs_disconnect: Callable[[], None] = lambda: None,
+    on_obs_reconnect: Callable[[], None] = lambda: None,
     close_event: threading.Event | None = None,
 ) -> None:
     midi_ready_event = threading.Event()
@@ -70,6 +72,8 @@ def run(
             start_event=midi_ready_event,
             close_event=close_event,
             error_bucket=error_bucket,
+            on_disconnect=on_obs_disconnect,
+            on_reconnect=on_obs_reconnect,
             daemon=True,
         )
         obs_events_thread.add_event_handler(initial_obs_query.handle_event)

@@ -87,6 +87,12 @@ class ObsClient:
 
         self._send(json.dumps(payload))
 
+        try:
+            self._recv(None)
+        except ObsDisconnect:
+            # Authentication failed
+            raise
+
     def _recv(self, timeout: float | None) -> str | bytes:
         assert self._ws is not None, "Not connected"
 
