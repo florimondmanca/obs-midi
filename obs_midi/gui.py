@@ -9,6 +9,7 @@ import mido
 from ttkthemes import ThemedTk
 
 from .core.main import run
+from .core.midi import rtmidi_input_opener
 from .logging import LOGGING_CONFIG
 
 logger = logging.getLogger(__name__)
@@ -92,10 +93,11 @@ class MainPage(ttk.Frame):
 
             try:
                 run(
-                    midi_port=midi_port,
+                    midi_input_opener=rtmidi_input_opener(
+                        port=midi_port, interactive=False
+                    ),
                     obs_port=obs_port,
                     obs_password=obs_password,
-                    interactive=False,
                     on_ready=on_ready,
                     on_obs_disconnect=on_obs_disconnect,
                     on_obs_reconnect=on_obs_reconnect,

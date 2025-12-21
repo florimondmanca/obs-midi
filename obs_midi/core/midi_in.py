@@ -5,7 +5,8 @@ import time
 from typing import Any, Callable
 
 import mido
-from rtmidi.midiutil import open_midiinput
+
+from .midi import MIDInputOpener
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +15,7 @@ class MIDInputThread(threading.Thread):
     def __init__(
         self,
         *,
-        port: str | None,
-        interactive: bool,
+        input_opener: MIDInputOpener,
         on_error: Callable[[Exception], None] = lambda exc: None,
         ready_event: threading.Event,
         close_event: threading.Event,
@@ -23,8 +23,7 @@ class MIDInputThread(threading.Thread):
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-        self._port = port
-        self._interactive = interactive
+        self._input_opener = input_opener
         self._ready_event = ready_event
         self._close_event = close_event
         self._error_bucket = error_bucket
@@ -36,31 +35,13 @@ class MIDInputThread(threading.Thread):
     def run(
         self,
     ) -> None:
-        logger.debug("Selected port: %s", self._port)
+        def midi_callback(msg: mido.Message) -> None:
+            logger.debug("Incoming message: %s", msg)
+            for handle_message in self._message_handlers:
+                handle_message(msg)
 
         try:
-            midi_input, port_name = open_midiinput(
-                self._port,
-                use_virtual=not self._interactive,
-                client_name="OBS MIDI",
-                port_name="Midi In",
-                interactive=self._interactive,
-            )
-
-            # https://spotlightkid.github.io/python-rtmidi/rtmidi.html#rtmidi.MidiIn.set_callback
-            @midi_input.set_callback
-            def midi_callback(event: tuple, data: object = None) -> None:
-                try:
-                    msg_bytes, _ = event
-                    msg: mido.Message = mido.parse(msg_bytes)
-                    logger.debug("Incoming message: %s", msg)
-                    for handle_message in self._message_handlers:
-                        handle_message(msg)
-                except Exception as exc:
-                    logger.error(exc)
-                    raise
-
-            with midi_input:
+            with self._input_opener(midi_callback):
                 logger.info("Listening for messages...")
                 self._ready_event.set()
 

@@ -3,6 +3,7 @@ import logging
 import logging.config
 
 from .core.main import run
+from .core.midi import rtmidi_input_opener
 from .logging import LOGGING_CONFIG
 from .utils.argparse import EnvDefault
 
@@ -41,10 +42,11 @@ def run_cli() -> None:
 
     try:
         run(
-            midi_port=args.midi_port,
+            midi_input_opener=rtmidi_input_opener(
+                port=args.midi_port, interactive=True
+            ),
             obs_port=args.obs_port,
             obs_password=args.obs_password,
-            interactive=True,
         )
     except Exception as exc:
         logger.error(exc)

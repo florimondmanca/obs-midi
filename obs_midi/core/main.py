@@ -7,7 +7,7 @@ from typing import Callable
 
 import mido
 
-from .midi import MIDITrigger
+from .midi import MIDInputOpener, MIDITrigger
 from .midi_in import MIDInputThread
 from .obs_client import open_obs_client
 from .obs_events import ObsEventsThread
@@ -17,11 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 def run(
-    midi_port: str | None,
+    midi_input_opener: MIDInputOpener,
     obs_port: int,
     obs_password: str,
     *,
-    interactive: bool,
     on_ready: Callable[[], None] = lambda: None,
     on_obs_disconnect: Callable[[], None] = lambda: None,
     on_obs_reconnect: Callable[[], None] = lambda: None,
@@ -52,8 +51,7 @@ def run(
                     return
 
         midi_input_thread = MIDInputThread(
-            port=midi_port,
-            interactive=interactive,
+            input_opener=midi_input_opener,
             ready_event=midi_ready_event,
             close_event=close_event,
             error_bucket=error_bucket,
@@ -101,30 +99,42 @@ def run(
 
         try:
             midi_ready_event.wait()
+            logger.info("MIDI input is ready")
 
             if not all(t.is_alive() for t in threads):
+                logger.info("Some threads dead after MIDI input ready, terminating...")
                 flush_error_bucket()
                 return
 
+            logger.info("Sending initial OBS query...")
             initial_obs_query.send()
+            logger.info("Initial OBS query sent")
 
             while not initial_obs_query.is_done():
                 time.sleep(0.2)
 
+            logger.info("Initial OBS query finished")
+
             if not all(t.is_alive() for t in threads):
+                logger.info(
+                    "Some threads dead after OBS query finished, terminating..."
+                )
                 flush_error_bucket()
                 return
 
+            logger.info("Application is ready")
             on_ready()
 
             while True:
                 if not all(t.is_alive() for t in threads):
+                    logger.info("Some threads dead during main loop, terminating...")
                     flush_error_bucket()
                     return
 
                 time.sleep(0.2)
 
                 if close_event.is_set():
+                    logger.info("Received close event in main loop, terminating...")
                     flush_error_bucket()
                     return
         except KeyboardInterrupt:
@@ -132,4 +142,6 @@ def run(
         except Exception:
             raise
         finally:
+            logger.info("Closing all threads...")
             close_all_threads()
+            logger.info("Threads closed")

@@ -36,7 +36,7 @@ class ObsEventsThread(threading.Thread):
 
     def _reconnect(self) -> None:
         while True:
-            logger.warn(
+            logger.warning(
                 "Reconnecting in %s seconds...",
                 self._reconnect_delay,
             )
@@ -75,7 +75,7 @@ class ObsEventsThread(threading.Thread):
                 logger.info("Stopped")
                 break
             except ObsDisconnect:
-                logger.warn("OBS disconnected.")
+                logger.warning("OBS disconnected.")
                 self._on_disconnect()
                 self._reconnect()
                 self._on_reconnect()
