@@ -68,6 +68,9 @@ def test_run() -> None:
             )
         )
 
+        close_event.wait()
+
+    def on_ready() -> None:
         # Finish early
         close_event.set()
 
@@ -76,7 +79,7 @@ def test_run() -> None:
             midi_input_opener=open_dummy_input,
             obs_port=4456,
             obs_password="test",
-            on_ready=lambda: None,
+            on_ready=on_ready,
             on_obs_disconnect=lambda: None,
             on_obs_reconnect=lambda: None,
             close_event=close_event,

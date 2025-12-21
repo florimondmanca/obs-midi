@@ -59,21 +59,17 @@ MIDICallback = Callable[[mido.Message], None]
 MIDInputOpener = Callable[[MIDICallback], ContextManager[None]]
 
 
-def rtmidi_input_opener(
-    *,
-    port: str | None,
-    interactive: bool,
-) -> MIDInputOpener:
+def rtmidi_input_opener(*, port: str | None) -> MIDInputOpener:
     @contextlib.contextmanager
     def _open_rtmidi_input(callback: MIDICallback) -> Iterator[None]:
         logger.debug("Selected port: %s", port)
 
         midi_input, port_name = open_midiinput(
             port,
-            use_virtual=not interactive,
+            use_virtual=True,
             client_name="OBS MIDI",
             port_name="Midi In",
-            interactive=interactive,
+            interactive=False,
         )
 
         # https://spotlightkid.github.io/python-rtmidi/rtmidi.html#rtmidi.MidiIn.set_callback

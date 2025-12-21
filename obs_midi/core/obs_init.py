@@ -1,6 +1,7 @@
 import logging
 import threading
-from typing import Callable
+import time
+from typing import Any, Callable
 
 from .midi import ControlChange, MIDITrigger
 from .obs_client import ObsClient
@@ -8,32 +9,55 @@ from .obs_client import ObsClient
 logger = logging.getLogger(__name__)
 
 
-class InitialOBSQuery:
+class ObsInitThread(threading.Thread):
     def __init__(
         self,
         client: ObsClient,
+        start_barrier: threading.Barrier,
+        close_event: threading.Event,
         on_scene_trigger: Callable[[tuple[MIDITrigger, str]], None] = (
             lambda args: None
         ),
         on_source_filter_trigger: Callable[[tuple[MIDITrigger, str, str]], None] = (
             lambda args: None
         ),
+        **kwargs: Any,
     ) -> None:
+        super().__init__(**kwargs)
         self._client = client
+        self._start_barrier = start_barrier
+        self._close_event = close_event
+        self._done_event = threading.Event()
         self._on_scene_trigger = on_scene_trigger
         self._on_source_filter_trigger = on_source_filter_trigger
-        self._done_event = threading.Event()
         self._request_ids: set[str] = set()
 
-    def send(self) -> None:
-        self._request_ids.add(self._client.send_request("GetSceneList"))
+    def run(self) -> None:
+        try:
+            self._start_barrier.wait()
+        except threading.BrokenBarrierError:
+            logger.info("Aborting...")
+            return
 
-    def is_done(self) -> bool:
-        return self._client.has_received_response_for_requests(self._request_ids)
+        self._request_ids.add(self._client.send_request("GetSceneList"))
+        logger.info("Scene list request sent")
+
+        while True:
+            if self._done_event.is_set():
+                logger.info("Done")
+                break
+
+            if self._close_event.is_set():
+                logger.info("Stopping...")
+                break
+
+            time.sleep(0.2)
 
     def handle_event(self, event: dict) -> None:
         if not self._client.is_request_response(event):
             return
+
+        self._request_ids.remove(event["d"]["requestId"])
 
         match event["d"]["requestType"]:
             case "GetSceneList":
@@ -70,4 +94,5 @@ class InitialOBSQuery:
                         self._on_source_filter_trigger((cc, source_name, filter_name))
                         logger.info("Detected filter trigger: %s", filter_name)
 
-                self._done_event.set()
+        if not self._request_ids:
+            self._done_event.set()

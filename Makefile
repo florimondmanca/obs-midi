@@ -22,6 +22,9 @@ format:
 	venv/bin/ruff check --select I --fix
 	venv/bin/ruff format
 
+test:
+	venv/bin/pytest -s
+
 cli:
 	venv/bin/python -m obs_midi.cli ${ARGS}
 

@@ -19,7 +19,7 @@ def run_gui() -> None:
     logging.config.dictConfig(LOGGING_CONFIG)
 
     root = ThemedTk(
-        # This should match the StartupWMClass in 'obs-midi.desktop' so that
+        # This should match the StartupWMClass in 'obs-midi.desktop' file so that
         # under Linux, X server knows to group the tkinter window with the launcher icon.
         className="obs-midi",
     )
@@ -29,9 +29,8 @@ def run_gui() -> None:
     args = parser.parse_args()
 
     root.set_theme(args.theme)
-    root.title("OBS MIDI")
 
-    MainApplication(root)
+    GUI(root)
 
     try:
         root.mainloop()
@@ -39,7 +38,7 @@ def run_gui() -> None:
         pass
 
 
-class MainApplication:
+class GUI:
     def __init__(self, root: tk.Tk) -> None:
         container = ttk.Frame(root)
         container.pack(side="top", fill="both", expand=True)
@@ -49,28 +48,39 @@ class MainApplication:
         main_page = MainPage(container, self)
         main_page.grid(row=0, column=0, sticky="nsew")
 
+        root.title("OBS MIDI")
+        root.protocol("WM_DELETE_WINDOW", main_page.on_quit)
+
         self._root = root
 
-    def quit(self) -> None:
+    def update(self) -> None:
+        self._root.update()
+
+    def destroy(self) -> None:
         self._root.destroy()
 
 
 class MainPage(ttk.Frame):
-    def __init__(self, parent: ttk.Frame, app: MainApplication) -> None:
+    def __init__(self, parent: ttk.Frame, gui: GUI) -> None:
         super().__init__(parent, padding=30)
 
+        self._gui = gui
         self._thread: threading.Thread | None = None
         self._close_event = threading.Event()
 
         config_form = ConfigForm(self)
 
         footer = ttk.Frame(self, padding=(0, 30, 0, 0))
-        ttk.Button(footer, text="Quit", command=app.quit).pack()
+        ttk.Button(footer, text="Quit", command=self.on_quit).pack()
 
         config_form.grid(row=0, column=0, sticky="n")
         footer.grid(row=1, column=0, sticky="we")
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
+
+    def on_quit(self) -> None:
+        self.stop_application()
+        self._gui.destroy()
 
     def start_application(
         self,
@@ -93,9 +103,7 @@ class MainPage(ttk.Frame):
 
             try:
                 run(
-                    midi_input_opener=rtmidi_input_opener(
-                        port=midi_port, interactive=False
-                    ),
+                    midi_input_opener=rtmidi_input_opener(port=midi_port),
                     obs_port=obs_port,
                     obs_password=obs_password,
                     on_ready=on_ready,
@@ -104,7 +112,7 @@ class MainPage(ttk.Frame):
                     close_event=self._close_event,
                 )
             except Exception as exc:
-                logger.error("Application returned an error: %s", repr(exc))
+                logger.exception("Application returned an error: %s", repr(exc))
                 on_error(exc)
             else:
                 # NOTE: we may reach this point if OBS closes the connection on their end,
@@ -122,10 +130,16 @@ class MainPage(ttk.Frame):
         return self._thread is not None
 
     def stop_application(self) -> None:
-        assert self.is_application_running(), "Application is not running"
         self._close_event.set()
-        # Don't join() to avoid blocking GUI mainloop
-        # Be confident the thread will terminate soon
+
+        if self._thread is threading.current_thread():
+            return
+
+        # Be careful not to block the main GUI thread
+        while self._thread is not None and self._thread.is_alive():
+            self._thread.join(0.1)
+            self._gui.update()
+
         self._thread = None
 
 

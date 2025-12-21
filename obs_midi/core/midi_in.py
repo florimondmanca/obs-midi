@@ -1,7 +1,6 @@
 import logging
 import queue
 import threading
-import time
 from typing import Any, Callable
 
 import mido
@@ -16,15 +15,15 @@ class MIDInputThread(threading.Thread):
         self,
         *,
         input_opener: MIDInputOpener,
-        on_error: Callable[[Exception], None] = lambda exc: None,
-        ready_event: threading.Event,
+        start_barrier: threading.Barrier,
         close_event: threading.Event,
         error_bucket: queue.Queue[Exception],
+        on_error: Callable[[Exception], None] = lambda exc: None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self._input_opener = input_opener
-        self._ready_event = ready_event
+        self._start_barrier = start_barrier
         self._close_event = close_event
         self._error_bucket = error_bucket
         self._message_handlers: list[Callable[[mido.Message], None]] = []
@@ -36,24 +35,30 @@ class MIDInputThread(threading.Thread):
         self,
     ) -> None:
         def midi_callback(msg: mido.Message) -> None:
-            logger.debug("Incoming message: %s", msg)
-            for handle_message in self._message_handlers:
-                handle_message(msg)
+            logger.info("Incoming MIDI message: %s", msg)
+
+            for handler in self._message_handlers:
+                handler(msg)
 
         try:
             with self._input_opener(midi_callback):
-                logger.info("Listening for messages...")
-                self._ready_event.set()
+                logger.info("MIDI input is open, listening for messages...")
 
                 try:
-                    while not self._close_event.is_set():
-                        time.sleep(0.2)
-                    logger.info("Stopped")
+                    self._start_barrier.wait()
+                except threading.BrokenBarrierError:
+                    logger.error("Aborting...")
+                    return
+
+                try:
+                    self._close_event.wait()
+                    logger.info("Stopping...")
                 except KeyboardInterrupt:
                     pass
-
         except Exception as exc:
             logger.error(exc)
-            self._ready_event.set()
+            self._start_barrier.abort()
             self._close_event.set()
             self._error_bucket.put_nowait(exc)
+        finally:
+            logger.info("Stopped")

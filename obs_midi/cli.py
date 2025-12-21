@@ -42,9 +42,7 @@ def run_cli() -> None:
 
     try:
         run(
-            midi_input_opener=rtmidi_input_opener(
-                port=args.midi_port, interactive=True
-            ),
+            midi_input_opener=rtmidi_input_opener(port=args.midi_port),
             obs_port=args.obs_port,
             obs_password=args.obs_password,
         )

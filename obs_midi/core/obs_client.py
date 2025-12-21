@@ -18,7 +18,7 @@ class ObsDisconnect(Exception):
 
 
 @contextmanager
-def open_obs_client(port: int, password: str) -> Iterator["ObsClient"]:
+def create_obs_client(port: int, password: str) -> Iterator["ObsClient"]:
     client = ObsClient(port=port, password=password)
 
     try:
@@ -43,7 +43,10 @@ class ObsClient:
     def connect(self) -> None:
         assert self._ws is None, "Already connected"
         self._ws = connect(f"ws://localhost:{self._port}")
-        self._authenticate()
+        try:
+            self._authenticate()
+        except ObsDisconnect:
+            raise
 
     def reconnect(self) -> None:
         if self._ws is not None:
@@ -113,20 +116,15 @@ class ObsClient:
             self._ws = None
             raise ObsDisconnect()
 
-    def iter_events(self) -> Iterator[dict | None]:
+    def iter_events(self, poll_interval: float | None) -> Iterator[dict | None]:
         while True:
-            msg = self._recv(timeout=0.2)
+            msg = self._recv(timeout=poll_interval)
 
             if not msg:
                 yield None
                 continue
 
-            event = json.loads(msg)
-
-            if self.is_request_response(event):
-                self._request_ids_with_response.add(event["d"]["requestId"])
-
-            yield event
+            yield json.loads(msg)
 
     def has_received_response_for_requests(self, request_ids: set[str]) -> bool:
         return all(
