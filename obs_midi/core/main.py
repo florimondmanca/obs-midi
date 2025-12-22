@@ -101,8 +101,8 @@ def run(
             logger.info("Stopping...")
     except KeyboardInterrupt:
         logger.info("Exiting...")
-    except Exception:
-        raise
+    except Exception as exc:
+        error_bucket.put(exc)
     finally:
         close_event.set()
 
@@ -111,9 +111,14 @@ def run(
 
         logger.info("Stopped")
 
-        try:
-            exc = error_bucket.get_nowait()
-        except queue.Empty:
-            pass
-        else:
-            raise exc
+        exceptions = []
+
+        while not error_bucket.empty():
+            exceptions.append(error_bucket.get_nowait())
+
+        if exceptions:
+            raise (
+                ExceptionGroup("Errors", exceptions)
+                if len(exceptions) >= 2
+                else exceptions[0]
+            )

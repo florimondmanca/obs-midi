@@ -1,3 +1,6 @@
+[project]
+requires-python = ">= 3.12"
+
 [tool.mypy]
 disallow_untyped_defs = true
 ignore_missing_imports = true

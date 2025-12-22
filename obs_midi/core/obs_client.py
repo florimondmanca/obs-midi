@@ -14,7 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 class ObsDisconnect(Exception):
-    pass
+    def __init__(self, code: int) -> None:
+        super().__init__()
+        self.code = code
 
 
 @contextmanager
@@ -103,18 +105,22 @@ class ObsClient:
             return self._ws.recv(timeout)
         except TimeoutError:
             return ""
-        except websockets.ConnectionClosed:
+        except websockets.ConnectionClosed as exc:
             self._ws = None
-            raise ObsDisconnect()
+            raise ObsDisconnect(
+                exc.rcvd.code if exc.rcvd else websockets.CloseCode.ABNORMAL_CLOSURE
+            )
 
     def _send(self, msg: str) -> None:
         assert self._ws is not None, "Not connected"
 
         try:
             self._ws.send(msg)
-        except websockets.ConnectionClosed:
+        except websockets.ConnectionClosed as exc:
             self._ws = None
-            raise ObsDisconnect()
+            raise ObsDisconnect(
+                exc.rcvd.code if exc.rcvd else websockets.CloseCode.ABNORMAL_CLOSURE
+            )
 
     def iter_events(self, poll_interval: float | None) -> Iterator[dict | None]:
         while True:
