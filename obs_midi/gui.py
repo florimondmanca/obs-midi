@@ -12,7 +12,7 @@ from .core.main import run
 from .core.midi import rtmidi_input_opener
 from .logging import LOGGING_CONFIG
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("obs_midi.gui")
 
 
 def run_gui() -> None:
@@ -52,6 +52,8 @@ class GUI:
         root.protocol("WM_DELETE_WINDOW", main_page.on_quit)
 
         self._root = root
+
+        logger.info("Ready")
 
     def update(self) -> None:
         self._root.update()
@@ -115,8 +117,6 @@ class MainPage(ttk.Frame):
                 logger.exception("Application returned an error: %s", repr(exc))
                 on_error(exc)
             else:
-                # NOTE: we may reach this point if OBS closes the connection on their end,
-                # e.g. if OBS was closed.
                 logger.info("Application has stopped")
                 on_stopped()
 
@@ -127,13 +127,10 @@ class MainPage(ttk.Frame):
         self._thread = t
 
     def is_application_running(self) -> bool:
-        return self._thread is not None
+        return self._thread is not None and self._thread.is_alive()
 
     def stop_application(self) -> None:
         self._close_event.set()
-
-        if self._thread is threading.current_thread():
-            return
 
         # Be careful not to block the main GUI thread
         while self._thread is not None and self._thread.is_alive():
@@ -233,10 +230,13 @@ class ConfigForm(ttk.Frame):
             widget.config(state=tk.DISABLED if disabled else tk.NORMAL)
 
     def _set_starting(self) -> None:
-        self._cta_label.set("Stop")
         self._set_disabled(True)
+        self._cta_button.config(state=tk.DISABLED)
+        self._status_label.config(foreground="grey")
 
     def _set_running(self) -> None:
+        self._cta_button.config(state=tk.NORMAL)
+        self._cta_label.set("Stop")
         self._status.set("Running")
         self._status_label.config(foreground="green")
 
@@ -245,18 +245,23 @@ class ConfigForm(ttk.Frame):
         self._status_label.config(foreground="darkorange")
 
     def _set_error(self, exc: Exception) -> None:
+        self._cta_button.config(state=tk.NORMAL)
+        self._cta_label.set("Stop")
         self._status.set("Error")
         self._status_label.config(foreground="red")
 
     def _set_stopped(self) -> None:
-        self._main_page.stop_application()
         self._cta_label.set("Start")
         self._status.set("")
-        self._status_label.config(foreground="black")
+        self._status_label.config(foreground="grey")
         self._set_disabled(False)
 
     def _on_click_cta(self) -> None:
         if self._main_page.is_application_running():
+            self._main_page.stop_application()
+            return
+
+        if self._status.get() == "Error":
             self._set_stopped()
             return
 

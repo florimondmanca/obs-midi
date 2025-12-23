@@ -7,7 +7,7 @@ from .core.midi import rtmidi_input_opener
 from .logging import LOGGING_CONFIG
 from .utils.argparse import EnvDefault
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("obs_midi.cli")
 
 
 def run_cli() -> None:
@@ -41,6 +41,7 @@ def run_cli() -> None:
     logging.config.dictConfig(LOGGING_CONFIG)
 
     try:
+        logger.info("Starting")
         run(
             midi_input_opener=rtmidi_input_opener(port=args.midi_port),
             obs_port=args.obs_port,
