@@ -57,10 +57,8 @@ OBS MIDI reads MIDI triggers directly from scene and filter names. This ensures 
 For MIDI CC, the format should be:
 
 ```
-<name> :: CCnn#vv@ch
+My Scene Name :: CC<number>#<value>@<channel>
 ```
-
-where `nn` is the CC number, `vv` the CC value, and `ch` the MIDI channel.
 
 For example, if a scene is named:
 
@@ -72,35 +70,17 @@ then receiving MIDI CC 20 with value 127 on channel 3 will make OBS switch to th
 
 ### Running via the GUI (recommended)
 
-Plug your MIDI interface into your computer
-
-Then start the "OBS MIDI" program (Linux) or (for all operating systems) the compiled `obs-midi` program.
-
-Select the MIDI port to use, enter the configured OBS WebSocket port and password, then click "Start".
-
-### Running via the command line interface (CLI) (Advanced)
-
-_**TODO**: this section is obsolete._
-
-The program may also be run from the terminal via a traditional CLI.
-
-```bash
-venv/bin/python main.py --midi-port=[MIDI_PORT] --obs-port=4455 --obs-password=[OBS_PASSWORD]
-```
-
-The program can also read all options from environment variables:
-
-* `OBS_PORT`: port of the obs-websockets server (default: 4455)
-* `OBS_PASSWORD`: set here the password of the OBS WebSocket server
-* `MIDI_PORT`: the MIDI port to listen on, for example `20:0`. Leave empty or unset to be prompted with a list of options upon running the program. Show available ports using `make input_ports`.
-
-For convenience, you can define these environment variables in a local `.env` file and run `make cli`, which will automatically load the dotenv file.
+1. Plug your MIDI interface into your computer
+2. Start the "OBS MIDI" program (Linux) or (for all operating systems) the compiled `obs-midi` program.
+3. Select the MIDI port to use, enter the configured OBS WebSocket port and password, then click "Start".
 
 ## Development
 
 Install additional development dependencies using `make install_dev`.
 
-See the `Makefile` for additional development commands such as `format` and `check`.
+To run the test suite, use `make test`.
+
+To format the code, use `make format`.
 
 ## License
 
