@@ -13,7 +13,7 @@ class ObsInitThread(threading.Thread):
     def __init__(
         self,
         client: ObsClient,
-        start_barrier: threading.Barrier,
+        ws_open_event: threading.Event,
         close_event: threading.Event,
         on_scene_trigger: Callable[[tuple[MIDITrigger, str]], None] = (
             lambda args: None
@@ -25,7 +25,7 @@ class ObsInitThread(threading.Thread):
     ) -> None:
         super().__init__(**kwargs)
         self._client = client
-        self._start_barrier = start_barrier
+        self._ws_open_event = ws_open_event
         self._close_event = close_event
         self._done_event = threading.Event()
         self._on_scene_trigger = on_scene_trigger
@@ -33,11 +33,17 @@ class ObsInitThread(threading.Thread):
         self._request_ids: set[str] = set()
 
     def run(self) -> None:
-        try:
-            self._start_barrier.wait()
-        except threading.BrokenBarrierError:
-            logger.info("Aborting...")
-            return
+        logger.info("Waiting for WebSocket to be open...")
+
+        while True:
+            if self._ws_open_event.is_set():
+                break
+
+            if self._close_event.is_set():
+                logger.info("Aborting...")
+                return
+
+            time.sleep(0.2)
 
         self._request_ids.add(self._client.send_request("GetSceneList"))
         logger.info("Scene list request sent")

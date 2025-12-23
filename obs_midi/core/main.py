@@ -23,6 +23,7 @@ def run(
     on_ready: Callable[[], None] = lambda: None,
     on_obs_disconnect: Callable[[], None] = lambda: None,
     on_obs_reconnect: Callable[[], None] = lambda: None,
+    obs_reconnect_delay: float = 2,
     close_event: threading.Event | None = None,
 ) -> None:
     if close_event is None:
@@ -48,7 +49,7 @@ def run(
                 client.enable_filter(source_name, filter_name)
                 return
 
-    start_barrier = threading.Barrier(4)
+    start_barrier = threading.Barrier(3)
 
     midi_input_thread = MIDInputThread(
         input_opener=midi_input_opener,
@@ -59,9 +60,11 @@ def run(
     )
     midi_input_thread.add_message_handler(on_midi_message)
 
+    ws_open_event = threading.Event()
+
     obs_init_thread = ObsInitThread(
         client,
-        start_barrier=start_barrier,
+        ws_open_event=ws_open_event,
         close_event=close_event,
         on_scene_trigger=scene_triggers.append,
         on_source_filter_trigger=source_filter_triggers.append,
@@ -70,11 +73,13 @@ def run(
 
     obs_events_thread = ObsEventsThread(
         client=client,
+        open_event=ws_open_event,
         start_barrier=start_barrier,
         close_event=close_event,
         error_bucket=error_bucket,
         on_disconnect=on_obs_disconnect,
         on_reconnect=on_obs_reconnect,
+        reconnect_delay=obs_reconnect_delay,
         daemon=True,
     )
     obs_events_thread.add_event_handler(obs_init_thread.handle_event)
@@ -94,6 +99,7 @@ def run(
         except threading.BrokenBarrierError:
             logger.error("Aborting...")
         else:
+            obs_init_thread.join()
             on_ready()
             logger.info("Ready")
 

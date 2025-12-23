@@ -14,21 +14,24 @@ class ObsEventsThread(threading.Thread):
         self,
         *,
         client: ObsClient,
+        open_event: threading.Event,
         start_barrier: threading.Barrier,
         close_event: threading.Event,
         error_bucket: queue.Queue[Exception],
         on_disconnect: Callable[[], None],
         on_reconnect: Callable[[], None],
+        reconnect_delay: float,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self._client = client
+        self._open_event = open_event
         self._start_barrier = start_barrier
         self._close_event = close_event
         self._error_bucket = error_bucket
         self._on_disconnect = on_disconnect
         self._on_reconnect = on_reconnect
-        self._reconnect_delay = 2
+        self._reconnect_delay = reconnect_delay
         self._event_handlers: list[Callable[[dict], None]] = []
 
     def add_event_handler(self, cb: Callable[[dict], None]) -> None:
@@ -62,6 +65,8 @@ class ObsEventsThread(threading.Thread):
             self._client.connect()
             logger.info("Connected to OBS WebSocket")
 
+            self._open_event.set()
+
             try:
                 self._start_barrier.wait()
             except threading.BrokenBarrierError:
@@ -88,6 +93,10 @@ class ObsEventsThread(threading.Thread):
                     logger.warning("OBS WebSocket disconnected")
                     self._on_disconnect()
 
+                    if self._close_event.is_set():
+                        logger.info("Stopping...")
+                        break
+
                     self._reconnect()
 
                     if self._close_event.is_set():
@@ -101,4 +110,5 @@ class ObsEventsThread(threading.Thread):
             self._close_event.set()
             self._error_bucket.put_nowait(exc)
         finally:
+            self._client.close()
             logger.info("Stopped")

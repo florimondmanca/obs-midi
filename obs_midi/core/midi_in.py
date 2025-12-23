@@ -42,13 +42,15 @@ class MIDInputThread(threading.Thread):
 
         try:
             with self._input_opener(midi_callback):
-                logger.info("MIDI input is open, listening for messages...")
+                logger.info("MIDI input is open")
 
                 try:
                     self._start_barrier.wait()
                 except threading.BrokenBarrierError:
                     logger.error("Aborting...")
                     return
+
+                logger.info("Listening for messages...")
 
                 try:
                     self._close_event.wait()
