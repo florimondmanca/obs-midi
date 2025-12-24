@@ -25,6 +25,7 @@ class DefaultFormatter(logging.Formatter):
     LOGGER_COLOR = {
         "obs_midi.cli": yellow,
         "obs_midi.gui": yellow,
+        "obs_midi.core.obs_actions": purple_bold,
         "obs_midi.core.obs_events": purple_bold,
         "obs_midi.core.obs_init": purple_bold,
         "obs_midi.core.midi_in": green_bold,

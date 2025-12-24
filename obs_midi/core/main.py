@@ -4,10 +4,8 @@ import queue
 import threading
 from typing import Callable
 
-import mido
-
-from .midi import MIDInputOpener, MIDITrigger
-from .midi_in import MIDInputThread
+from .midi_in import MIDInputOpener, MIDInputThread
+from .obs_actions import ObsActions
 from .obs_client import ObsClient
 from .obs_events import ObsEventsThread
 from .obs_init import ObsInitThread
@@ -30,25 +28,8 @@ def run(
         close_event = threading.Event()
 
     error_bucket: queue.Queue[Exception] = queue.Queue()
-
     client = ObsClient(port=obs_port, password=obs_password)
-
-    scene_triggers: list[tuple[MIDITrigger, str]] = []
-    source_filter_triggers: list[tuple[MIDITrigger, str, str]] = []
-
-    def on_midi_message(msg: mido.Message) -> None:
-        for trigger, scene in scene_triggers:
-            if trigger.matches(msg):
-                logger.info("Switch scene: %s", scene)
-                client.set_current_program_scene(scene)
-                return
-
-        for trigger, source_name, filter_name in source_filter_triggers:
-            if trigger.matches(msg):
-                logger.info("Show filter: %s on %s", filter_name, source_name)
-                client.enable_filter(source_name, filter_name)
-                return
-
+    obs_actions = ObsActions()
     start_barrier = threading.Barrier(3)
 
     midi_input_thread = MIDInputThread(
@@ -58,16 +39,17 @@ def run(
         error_bucket=error_bucket,
         daemon=True,
     )
-    midi_input_thread.add_message_handler(on_midi_message)
+    midi_input_thread.add_message_handler(
+        lambda msg: obs_actions.process(msg, client=client)
+    )
 
     ws_open_event = threading.Event()
 
     obs_init_thread = ObsInitThread(
         client,
+        obs_actions=obs_actions,
         ws_open_event=ws_open_event,
         close_event=close_event,
-        on_scene_trigger=scene_triggers.append,
-        on_source_filter_trigger=source_filter_triggers.append,
         daemon=True,
     )
 

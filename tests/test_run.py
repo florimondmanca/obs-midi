@@ -11,7 +11,7 @@ from websockets.sync.connection import Connection
 from websockets.sync.server import Server, serve
 
 from obs_midi.core.main import run
-from obs_midi.core.midi import MIDICallback
+from obs_midi.core.midi_in import MIDICallback
 from obs_midi.core.obs_client import ObsDisconnect
 
 

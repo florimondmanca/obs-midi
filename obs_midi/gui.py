@@ -9,7 +9,7 @@ import mido
 from ttkthemes import ThemedTk
 
 from .core.main import run
-from .core.midi import rtmidi_input_opener
+from .core.midi_in import rtmidi_input_opener
 from .logging import LOGGING_CONFIG
 
 logger = logging.getLogger("obs_midi.gui")
@@ -25,10 +25,9 @@ def run_gui() -> None:
     )
 
     parser = argparse.ArgumentParser(prog="obs-midi")
-    parser.set_defaults(theme="yaru")
-    args = parser.parse_args()
+    parser.parse_args()
 
-    root.set_theme(args.theme)
+    root.set_theme("yaru")
 
     GUI(root)
 
@@ -74,7 +73,6 @@ class MainPage(ttk.Frame):
 
         config_form.grid(row=0, column=0, sticky="n")
         self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=1)
 
     def on_quit(self) -> None:
         self.stop_application()
