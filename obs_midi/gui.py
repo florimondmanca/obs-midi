@@ -72,11 +72,7 @@ class MainPage(ttk.Frame):
 
         config_form = ConfigForm(self)
 
-        footer = ttk.Frame(self, padding=(0, 30, 0, 0))
-        ttk.Button(footer, text="Quit", command=self.on_quit).pack()
-
         config_form.grid(row=0, column=0, sticky="n")
-        footer.grid(row=1, column=0, sticky="we")
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
@@ -146,6 +142,7 @@ class ConfigForm(ttk.Frame):
     def __init__(self, main_page: MainPage) -> None:
         super().__init__(main_page)
         self._main_page = main_page
+        self._is_error = False
 
         available_midi_ports = mido.get_input_names()
         midi_port_options = [self._MIDI_PORT_VIRTUAL, *available_midi_ports]
@@ -245,32 +242,37 @@ class ConfigForm(ttk.Frame):
         self._status_label.config(foreground="darkorange")
 
     def _set_error(self, exc: Exception) -> None:
+        self._is_error = True
         self._cta_button.config(state=tk.NORMAL)
         self._cta_label.set("Stop")
-        self._status.set("Error")
+        self._status.set(f"Error: {exc}" if str(exc) else "Error")
         self._status_label.config(foreground="red")
 
     def _set_stopped(self) -> None:
+        self._is_error = False
+        self._set_disabled(False)
         self._cta_label.set("Start")
         self._status.set("")
         self._status_label.config(foreground="grey")
-        self._set_disabled(False)
 
     def _on_click_cta(self) -> None:
         if self._main_page.is_application_running():
             self._main_page.stop_application()
             return
 
-        if self._status.get() == "Error":
+        if self._is_error:
             self._set_stopped()
             return
 
+        self._is_error = False
         self._set_starting()
 
-        midi_port = self._midi_port.get()
-
         self._main_page.start_application(
-            midi_port=midi_port if midi_port != self._MIDI_PORT_VIRTUAL else None,
+            midi_port=(
+                None
+                if (midi_port := self._midi_port.get()) == self._MIDI_PORT_VIRTUAL
+                else midi_port
+            ),
             obs_port=int(self._obs_port.get()),
             obs_password=self._obs_password.get(),
             on_ready=lambda: self._set_running(),

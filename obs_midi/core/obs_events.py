@@ -89,7 +89,11 @@ class ObsEventsThread(threading.Thread):
                             handle_event(event)
 
                     break
-                except ObsDisconnect:
+                except ObsDisconnect as exc:
+                    if exc.is_session_invalidated_error:
+                        logger.warning("Session invalidated from OBS UI, aborting...")
+                        raise
+
                     logger.warning("OBS WebSocket disconnected")
                     self._on_disconnect()
 

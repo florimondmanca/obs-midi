@@ -18,6 +18,20 @@ class ObsDisconnect(Exception):
         super().__init__()
         self.code = code
 
+    @property
+    def is_session_invalidated_error(self) -> bool:
+        return self.code == 4011
+
+    def __str__(self) -> str:
+        match self.code:
+            # https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md#websocketclosecode
+            case 4009:
+                return "Authentication failed"
+            case 4011:
+                return "Session invalidated"
+            case _:
+                return "Unknown error"
+
 
 @contextmanager
 def create_obs_client(port: int, password: str) -> Iterator["ObsClient"]:
@@ -71,6 +85,8 @@ class ObsClient:
         self._ws = None
 
     def _authenticate(self) -> None:
+        # https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md#connection-steps
+
         server_hello = json.loads(self._recv(None))
 
         secret = base64.b64encode(
@@ -85,17 +101,21 @@ class ObsClient:
             ).digest()
         ).decode()
 
-        payload = {
+        client_identify = {
             "op": 1,
-            "d": {"rpcVersion": 1, "authentication": auth},
+            "d": {
+                "rpcVersion": 1,
+                "authentication": auth,
+                # https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md#eventsubscription
+                "eventSubscriptions": 0,  # None (we don't need to receive any events yet)
+            },
         }
 
-        self._send(json.dumps(payload))
+        self._send(json.dumps(client_identify))
 
         try:
             self._recv(None)
         except ObsDisconnect:
-            # Authentication failed
             raise
 
     def _recv(self, timeout: float | None) -> str | bytes:
