@@ -31,6 +31,9 @@ cli:
 gui:
 	venv/bin/python -m obs_midi.gui ${ARGS}
 
+gui-reload:
+	make gui ARGS="--reload"
+
 dist:
 	venv/bin/python -m obs_midi.packaging.build
 

@@ -2,6 +2,7 @@ import argparse
 import logging
 import threading
 import tkinter as tk
+from pathlib import Path
 from tkinter import ttk
 from typing import Callable
 
@@ -18,16 +19,35 @@ logger = logging.getLogger("obs_midi.gui")
 def run_gui() -> None:
     logging.config.dictConfig(LOGGING_CONFIG)
 
+    parser = argparse.ArgumentParser(prog="obs-midi")
+    parser.add_argument("--reload", action="store_true")
+    args = parser.parse_args()
+
+    if args.reload:
+        try:
+            import watchfiles
+        except ImportError:
+            logger.error("watchfiles is not installed, run 'make install_dev'")
+            raise SystemExit(1)
+
+        raise SystemExit(
+            watchfiles.run_process(
+                Path(__file__).parent,
+                target=_run_gui,
+                callback=lambda changes: logger.info("Changes detected, reloading..."),
+            )
+        )
+
+    _run_gui()
+
+
+def _run_gui() -> None:
     root = ThemedTk(
         # This should match the StartupWMClass in 'obs-midi.desktop' file so that
         # under Linux, X server knows to group the tkinter window with the launcher icon.
         className="obs-midi",
+        theme="yaru",
     )
-
-    parser = argparse.ArgumentParser(prog="obs-midi")
-    parser.parse_args()
-
-    root.set_theme("yaru")
 
     GUI(root)
 
@@ -51,11 +71,15 @@ class GUI:
         root.protocol("WM_DELETE_WINDOW", main_page.on_quit)
 
         self._root = root
+        self._main_page = main_page
 
         logger.info("Ready")
 
     def update(self) -> None:
         self._root.update()
+
+    def on_sigint(self) -> None:
+        self._main_page.on_quit()
 
     def destroy(self) -> None:
         self._root.destroy()
