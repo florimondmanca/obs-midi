@@ -85,9 +85,6 @@ class ConfigForm(ttk.Frame):
 
         self.grid_columnconfigure(1, weight=1)
 
-    def get_midi_input(self) -> str:
-        return self._midi_port.get()
-
     def _submit(self) -> None:
         if self._can_run():
             self._gui.focus_none()

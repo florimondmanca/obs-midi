@@ -12,13 +12,15 @@ from .obs_init import ObsInitThread
 
 logger = logging.getLogger(__name__)
 
+INFO_MIDI_INPUT_PORT_NAME = "midi_input_port_name"
+
 
 def run(
     midi_input_opener: MIDInputOpener,
     obs_port: int,
     obs_password: str,
     *,
-    on_ready: Callable[[], None] = lambda: None,
+    on_ready: Callable[[dict], None] = lambda info: None,
     on_obs_disconnect: Callable[[], None] = lambda: None,
     on_obs_reconnect: Callable[[], None] = lambda: None,
     obs_reconnect_delay: float = 2,
@@ -82,7 +84,7 @@ def run(
             logger.error("Aborting...")
         else:
             obs_init_thread.join()
-            on_ready()
+            on_ready({INFO_MIDI_INPUT_PORT_NAME: midi_input_thread.get_port_name()})
             logger.info("Ready")
 
             close_event.wait()

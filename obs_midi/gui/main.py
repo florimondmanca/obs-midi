@@ -6,6 +6,7 @@ from pathlib import Path
 from ttkthemes import ThemedTk
 
 from ..logging import LOGGING_CONFIG
+from .constants import WM_CLASS_NAME
 from .gui import GUI
 
 logger = logging.getLogger("obs_midi.gui")
@@ -42,9 +43,7 @@ def _run_gui() -> None:
     logging.config.dictConfig(LOGGING_CONFIG)
 
     root = ThemedTk(
-        # This should match the StartupWMClass in 'obs-midi.desktop' file so that
-        # under Linux, X server knows to group the tkinter window with the launcher icon.
-        className="obs-midi",
+        className=WM_CLASS_NAME,
         theme="yaru",
     )
 

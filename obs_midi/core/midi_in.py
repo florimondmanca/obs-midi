@@ -10,12 +10,14 @@ logger = logging.getLogger(__name__)
 
 
 MIDICallback = Callable[[mido.Message], None]
-MIDInputOpener = Callable[[MIDICallback], ContextManager[None]]
+MIDInputOpener = Callable[[MIDICallback], ContextManager[dict]]
+
+INFO_PORT_NAME = "port_name"
 
 
 def mido_input_opener(*, port: str | None) -> MIDInputOpener:
     @contextlib.contextmanager
-    def _open_midi_input(callback: MIDICallback) -> Iterator[None]:
+    def _open_midi_input(callback: MIDICallback) -> Iterator[dict]:
         logger.debug("Selected port: %s", port)
 
         def midi_callback(msg: mido.Message) -> None:
@@ -26,8 +28,8 @@ def mido_input_opener(*, port: str | None) -> MIDInputOpener:
             virtual=port is None,
             callback=midi_callback,
             client_name="OBS MIDI",
-        ):
-            yield
+        ) as midi_input:
+            yield {INFO_PORT_NAME: midi_input.name}
 
     return _open_midi_input
 
@@ -50,6 +52,10 @@ class MIDInputThread(threading.Thread):
         self._error_bucket = error_bucket
         self._message_handlers: list[Callable[[mido.Message], None]] = []
 
+    def get_port_name(self) -> str:
+        assert self._info is not None
+        return self._info[INFO_PORT_NAME]
+
     def add_message_handler(self, cb: Callable[[mido.Message], None]) -> None:
         self._message_handlers.append(cb)
 
@@ -63,7 +69,8 @@ class MIDInputThread(threading.Thread):
                 handler(msg)
 
         try:
-            with self._input_opener(midi_callback):
+            with self._input_opener(midi_callback) as info:
+                self._info = info
                 logger.info("MIDI input is open")
 
                 try:

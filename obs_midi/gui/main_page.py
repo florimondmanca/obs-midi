@@ -1,9 +1,10 @@
 import logging
 import threading
+import tkinter as tk
 from tkinter import ttk
 from typing import TYPE_CHECKING, Callable
 
-from ..core.main import run
+from ..core.main import INFO_MIDI_INPUT_PORT_NAME, run
 from ..core.midi_in import mido_input_opener
 from .config_form import ConfigForm
 from .debug_modal import DebugModal
@@ -20,18 +21,46 @@ class MainPage(ttk.Frame):
 
         self._gui = gui
         self._application_thread: threading.Thread | None = None
+        self._application_info: dict | None = None
         self._close_event = threading.Event()
 
         config_form = ConfigForm(self, gui)
+
+        self._debug_modal: DebugModal | None = None
         debug_button = ttk.Button(
             self,
+            state=tk.DISABLED,
             text="Open debug modal",
-            command=lambda: DebugModal(self, midi_input=config_form.get_midi_input()),
+            command=lambda: self._on_click_debug_button(),
         )
+        self._debug_button = debug_button
 
         config_form.grid(row=0, column=0, sticky="n")
         debug_button.grid(row=1, column=0, sticky="n")
         self.grid_rowconfigure(0, weight=1)
+
+    def _on_click_debug_button(self) -> None:
+        if self._debug_modal is not None:
+            self._debug_modal.focus()
+            # Place on top
+            # https://stackoverflow.com/a/45064895
+            self._debug_modal.attributes("-topmost", True)
+            self._debug_modal.update()
+            self._debug_modal.attributes("-topmost", False)
+            return
+
+        assert self._application_info is not None
+
+        self._debug_modal = DebugModal(
+            self, midi_input=self._application_info[INFO_MIDI_INPUT_PORT_NAME]
+        )
+
+        def on_debug_modal_closed() -> None:
+            assert self._debug_modal is not None
+            self._debug_modal.destroy()
+            self._debug_modal = None
+
+        self._debug_modal.protocol("WM_DELETE_WINDOW", lambda: on_debug_modal_closed())
 
     def on_quit(self) -> None:
         self.stop_application()
@@ -50,18 +79,24 @@ class MainPage(ttk.Frame):
         on_stopped: Callable[[], None] = lambda: None,
     ) -> None:
         assert not self.is_application_running(), "Application is already running"
+        self._application_info = None
 
         self._close_event.clear()
 
         def _run() -> None:
             logger.info("Application thread has started")
 
+            def _on_ready(info: dict) -> None:
+                on_ready()
+                self._application_info = info
+                self._debug_button.config(state=tk.NORMAL)
+
             try:
                 run(
                     midi_input_opener=mido_input_opener(port=midi_port),
                     obs_port=obs_port,
                     obs_password=obs_password,
-                    on_ready=on_ready,
+                    on_ready=_on_ready,
                     on_obs_disconnect=on_obs_disconnect,
                     on_obs_reconnect=on_obs_reconnect,
                     close_event=self._close_event,
@@ -86,6 +121,7 @@ class MainPage(ttk.Frame):
 
     def stop_application(self) -> None:
         self._close_event.set()
+        self._debug_button.config(state=tk.DISABLED)
 
         # Be careful not to block the main GUI thread
         while (

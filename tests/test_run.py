@@ -11,7 +11,7 @@ from websockets.sync.connection import Connection
 from websockets.sync.server import Server, serve
 
 from obs_midi.core.main import run
-from obs_midi.core.midi_in import MIDICallback
+from obs_midi.core.midi_in import INFO_PORT_NAME, MIDICallback
 from obs_midi.core.obs_client import ObsDisconnect
 
 
@@ -47,7 +47,7 @@ def test_run_full() -> None:
     server_error_bucket: queue.Queue[Exception] = queue.Queue(maxsize=1)
 
     @contextlib.contextmanager
-    def open_dummy_input(callback: MIDICallback) -> Iterator[None]:
+    def open_dummy_input(callback: MIDICallback) -> Iterator[dict]:
         def midi_stream() -> None:
             ready_event.wait()
 
@@ -72,7 +72,7 @@ def test_run_full() -> None:
             close_event.set()
 
         threading.Thread(target=midi_stream, daemon=True).start()
-        yield
+        yield {INFO_PORT_NAME: "dummy"}
 
     def handler(ws: Connection) -> None:
         try:
@@ -216,7 +216,7 @@ def test_run_full() -> None:
             midi_input_opener=open_dummy_input,
             obs_port=3456,
             obs_password="test",
-            on_ready=lambda: ready_event.set(),
+            on_ready=lambda info: ready_event.set(),
             on_obs_disconnect=lambda: obs_disconnect_event.set(),
             on_obs_reconnect=lambda: obs_reconnect_event.set(),
             close_event=close_event,
@@ -234,9 +234,9 @@ def test_run_midi_and_obs_startup_errors() -> None:
     close_event = threading.Event()
 
     @contextlib.contextmanager
-    def open_error_input(callback: MIDICallback) -> Iterator[None]:
+    def open_error_input(callback: MIDICallback) -> Iterator[dict]:
         raise RuntimeError("MIDI Error")
-        yield
+        yield from ()
 
     ready_event = threading.Event()
     obs_disconnect_event = threading.Event()
@@ -247,7 +247,7 @@ def test_run_midi_and_obs_startup_errors() -> None:
             midi_input_opener=open_error_input,
             obs_port=3456,  # No server running
             obs_password="test",
-            on_ready=lambda: ready_event.set(),
+            on_ready=lambda info: ready_event.set(),
             on_obs_disconnect=lambda: obs_disconnect_event.set(),
             on_obs_reconnect=lambda: obs_reconnect_event.set(),
             close_event=close_event,
@@ -267,8 +267,8 @@ def test_run_obs_auth_error() -> None:
     close_event = threading.Event()
 
     @contextlib.contextmanager
-    def open_dummy_input(callback: MIDICallback) -> Iterator[None]:
-        yield
+    def open_dummy_input(callback: MIDICallback) -> Iterator[dict]:
+        yield {INFO_PORT_NAME: "dummy"}
 
     def handler(ws: Connection) -> None:
         # Authentication handshake
@@ -289,7 +289,7 @@ def test_run_obs_auth_error() -> None:
                 midi_input_opener=open_dummy_input,
                 obs_port=3456,
                 obs_password="test",
-                on_ready=lambda: ready_event.set(),
+                on_ready=lambda info: ready_event.set(),
                 on_obs_disconnect=lambda: obs_disconnect_event.set(),
                 on_obs_reconnect=lambda: obs_reconnect_event.set(),
                 close_event=close_event,
@@ -309,7 +309,7 @@ def test_run_obs_reconnect() -> None:
     server_error_bucket: queue.Queue[Exception] = queue.Queue(maxsize=1)
 
     @contextlib.contextmanager
-    def open_dummy_input(callback: MIDICallback) -> Iterator[None]:
+    def open_dummy_input(callback: MIDICallback) -> Iterator[dict]:
         def midi_stream() -> None:
             ready_event.wait()
 
@@ -322,7 +322,7 @@ def test_run_obs_reconnect() -> None:
             close_event.set()
 
         threading.Thread(target=midi_stream, daemon=True).start()
-        yield
+        yield {INFO_PORT_NAME: "dummy"}
 
     handler_called = False
 
@@ -431,7 +431,7 @@ def test_run_obs_reconnect() -> None:
             midi_input_opener=open_dummy_input,
             obs_port=3456,
             obs_password="test",
-            on_ready=lambda: ready_event.set(),
+            on_ready=lambda info: ready_event.set(),
             on_obs_disconnect=lambda: obs_disconnect_event.set(),
             on_obs_reconnect=on_obs_reconnect,
             obs_reconnect_delay=0.2,
