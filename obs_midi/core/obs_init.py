@@ -54,6 +54,9 @@ class ObsInitThread(threading.Thread):
             time.sleep(0.2)
 
     def handle_event(self, event: dict) -> None:
+        if self._done_event.is_set():
+            return
+
         if not self._client.is_request_response(event):
             return
 
