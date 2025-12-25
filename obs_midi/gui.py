@@ -1,5 +1,6 @@
 import argparse
 import logging
+import sys
 import threading
 import tkinter as tk
 from pathlib import Path
@@ -17,8 +18,6 @@ logger = logging.getLogger("obs_midi.gui")
 
 
 def run_gui() -> None:
-    logging.config.dictConfig(LOGGING_CONFIG)
-
     parser = argparse.ArgumentParser(prog="obs-midi")
     parser.add_argument("--reload", action="store_true")
     args = parser.parse_args()
@@ -27,14 +26,17 @@ def run_gui() -> None:
         try:
             import watchfiles
         except ImportError:
-            logger.error("watchfiles is not installed, run 'make install_dev'")
+            print(
+                "ERROR: watchfiles is not installed, run 'make install_dev'",
+                file=sys.stderr,
+            )
             raise SystemExit(1)
 
         raise SystemExit(
             watchfiles.run_process(
                 Path(__file__).parent,
                 target=_run_gui,
-                callback=lambda changes: logger.info("Changes detected, reloading..."),
+                callback=lambda changes: print("Changes detected, reloading..."),
             )
         )
 
@@ -42,6 +44,8 @@ def run_gui() -> None:
 
 
 def _run_gui() -> None:
+    logging.config.dictConfig(LOGGING_CONFIG)
+
     root = ThemedTk(
         # This should match the StartupWMClass in 'obs-midi.desktop' file so that
         # under Linux, X server knows to group the tkinter window with the launcher icon.
@@ -68,12 +72,21 @@ class GUI:
         main_page.grid(row=0, column=0, sticky="nsew")
 
         root.title("OBS MIDI")
-        root.protocol("WM_DELETE_WINDOW", main_page.on_quit)
+        root.protocol(
+            # Override window close button
+            "WM_DELETE_WINDOW",
+            main_page.on_quit,
+        )
+        root.bind("<Control-q>", lambda *args: main_page.on_quit())
 
         self._root = root
         self._main_page = main_page
 
         logger.info("Ready")
+
+    def focus_none(self) -> None:
+        # Focusing the root has the effect of unfocusing all other widgets
+        self._root.focus()
 
     def update(self) -> None:
         self._root.update()
@@ -93,7 +106,7 @@ class MainPage(ttk.Frame):
         self._thread: threading.Thread | None = None
         self._close_event = threading.Event()
 
-        config_form = ConfigForm(self)
+        config_form = ConfigForm(self, gui)
 
         config_form.grid(row=0, column=0, sticky="n")
         self.grid_rowconfigure(0, weight=1)
@@ -161,9 +174,10 @@ class MainPage(ttk.Frame):
 class ConfigForm(ttk.Frame):
     _MIDI_PORT_VIRTUAL = "<New virtual MIDI port>"
 
-    def __init__(self, main_page: MainPage) -> None:
+    def __init__(self, main_page: MainPage, gui: GUI) -> None:
         super().__init__(main_page)
         self._main_page = main_page
+        self._gui = gui
         self._is_error = False
 
         available_midi_ports = mido.get_input_names()
@@ -178,6 +192,7 @@ class ConfigForm(ttk.Frame):
             textvariable=self._midi_port,
             values=midi_port_options,
         )
+        self._midi_port_entry.bind("<Return>", lambda *args: self._submit())
         self._add_field(row=0, label_text="midi-port", widget=self._midi_port_entry)
 
         # OBS Port
@@ -188,6 +203,7 @@ class ConfigForm(ttk.Frame):
             textvariable=self._obs_port,
             width=width,
         )
+        self._obs_port_entry.bind("<Return>", lambda *args: self._submit())
         self._add_field(row=1, label_text="obs-port", widget=self._obs_port_entry)
 
         # OBS Password
@@ -199,6 +215,7 @@ class ConfigForm(ttk.Frame):
             textvariable=self._obs_password,
             width=width,
         )
+        self._obs_password_entry.bind("<Return>", lambda *args: self._submit())
         self._add_field(
             row=2, label_text="obs-password", widget=self._obs_password_entry
         )
@@ -226,6 +243,11 @@ class ConfigForm(ttk.Frame):
         cta_frame.grid(row=3, column=0, columnspan=2)
 
         self.grid_columnconfigure(1, weight=1)
+
+    def _submit(self) -> None:
+        if self._can_run():
+            self._gui.focus_none()
+            self._on_click_cta()
 
     def _add_field(self, row: int, label_text: str, widget: ttk.Widget) -> None:
         ttk.Label(self, text=label_text, justify="left").grid(
