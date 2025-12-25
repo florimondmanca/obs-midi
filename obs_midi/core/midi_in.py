@@ -38,8 +38,11 @@ def rtmidi_input_opener(*, port: str | None) -> MIDInputOpener:
                 logger.error(exc)
                 raise
 
-        with midi_input:
-            yield
+        try:
+            with midi_input:
+                yield
+        finally:
+            midi_input.delete()  # Ensure virtual port is closed
 
     return _open_rtmidi_input
 

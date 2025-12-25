@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Callable
 from ..core.main import run
 from ..core.midi_in import rtmidi_input_opener
 from .config_form import ConfigForm
+from .debug_modal import DebugModal
 
 if TYPE_CHECKING:
     from .gui import GUI
@@ -22,8 +23,14 @@ class MainPage(ttk.Frame):
         self._close_event = threading.Event()
 
         config_form = ConfigForm(self, gui)
+        debug_button = ttk.Button(
+            self,
+            text="Open debug modal",
+            command=lambda: DebugModal(self, midi_input=config_form.get_midi_input()),
+        )
 
         config_form.grid(row=0, column=0, sticky="n")
+        debug_button.grid(row=1, column=0, sticky="n")
         self.grid_rowconfigure(0, weight=1)
 
     def on_quit(self) -> None:
