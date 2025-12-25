@@ -1,6 +1,6 @@
 import tkinter as tk
 
-import rtmidi
+import mido
 
 
 class DebugModal(tk.Toplevel):
@@ -8,5 +8,4 @@ class DebugModal(tk.Toplevel):
         super().__init__(parent)
         self.title("OBS MIDI - Debug")
 
-        midi_in = rtmidi.MidiIn()
-        print(midi_in.get_ports())
+        print(mido.get_output_names())

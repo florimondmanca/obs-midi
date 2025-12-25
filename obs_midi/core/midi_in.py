@@ -5,7 +5,6 @@ import threading
 from typing import Any, Callable, ContextManager, Iterator
 
 import mido
-from rtmidi.midiutil import open_midiinput
 
 logger = logging.getLogger(__name__)
 
@@ -14,37 +13,23 @@ MIDICallback = Callable[[mido.Message], None]
 MIDInputOpener = Callable[[MIDICallback], ContextManager[None]]
 
 
-def rtmidi_input_opener(*, port: str | None) -> MIDInputOpener:
+def mido_input_opener(*, port: str | None) -> MIDInputOpener:
     @contextlib.contextmanager
-    def _open_rtmidi_input(callback: MIDICallback) -> Iterator[None]:
+    def _open_midi_input(callback: MIDICallback) -> Iterator[None]:
         logger.debug("Selected port: %s", port)
 
-        midi_input, port_name = open_midiinput(
-            port,
-            use_virtual=True,
+        def midi_callback(msg: mido.Message) -> None:
+            callback(msg)
+
+        with mido.open_input(
+            name="MIDI In" if port is None else port,
+            virtual=port is None,
+            callback=midi_callback,
             client_name="OBS MIDI",
-            port_name="Midi In",
-            interactive=False,
-        )
+        ):
+            yield
 
-        # https://spotlightkid.github.io/python-rtmidi/rtmidi.html#rtmidi.MidiIn.set_callback
-        @midi_input.set_callback
-        def midi_callback(event: tuple, data: object = None) -> None:
-            try:
-                msg_bytes, _ = event
-                msg: mido.Message = mido.parse(msg_bytes)
-                callback(msg)
-            except Exception as exc:
-                logger.error(exc)
-                raise
-
-        try:
-            with midi_input:
-                yield
-        finally:
-            midi_input.delete()  # Ensure virtual port is closed
-
-    return _open_rtmidi_input
+    return _open_midi_input
 
 
 class MIDInputThread(threading.Thread):

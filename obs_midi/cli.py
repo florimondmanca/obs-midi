@@ -3,7 +3,7 @@ import logging
 import logging.config
 
 from .core.main import run
-from .core.midi import rtmidi_input_opener
+from .core.midi_in import mido_input_opener
 from .logging import LOGGING_CONFIG
 from .utils.argparse import EnvDefault
 
@@ -43,7 +43,7 @@ def run_cli() -> None:
     try:
         logger.info("Starting")
         run(
-            midi_input_opener=rtmidi_input_opener(port=args.midi_port),
+            midi_input_opener=mido_input_opener(port=args.midi_port),
             obs_port=args.obs_port,
             obs_password=args.obs_password,
         )

@@ -4,7 +4,7 @@ from tkinter import ttk
 from typing import TYPE_CHECKING, Callable
 
 from ..core.main import run
-from ..core.midi_in import rtmidi_input_opener
+from ..core.midi_in import mido_input_opener
 from .config_form import ConfigForm
 from .debug_modal import DebugModal
 
@@ -58,7 +58,7 @@ class MainPage(ttk.Frame):
 
             try:
                 run(
-                    midi_input_opener=rtmidi_input_opener(port=midi_port),
+                    midi_input_opener=mido_input_opener(port=midi_port),
                     obs_port=obs_port,
                     obs_password=obs_password,
                     on_ready=on_ready,
