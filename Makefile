@@ -29,7 +29,7 @@ cli:
 	venv/bin/python -m obs_midi.cli ${ARGS}
 
 gui:
-	venv/bin/python -m obs_midi.gui ${ARGS}
+	venv/bin/python -m main ${ARGS}
 
 gui-reload:
 	make gui ARGS="--reload"
