@@ -65,7 +65,9 @@ class GUI:
             self._debug_modal.destroy()
             self._debug_modal = None
 
+        # Window close button
         self._debug_modal.protocol("WM_DELETE_WINDOW", lambda: on_debug_modal_closed())
+        self._debug_modal.bind("<Control-w>", lambda *args: on_debug_modal_closed())
 
     def start_application(
         self,

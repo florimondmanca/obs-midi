@@ -12,7 +12,12 @@ class Menu:
 
         file_menu = tk.Menu(menu, tearoff=0)
         menu.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="Quit", command=lambda: gui.destroy())
+        file_menu.add_command(
+            label="Quit",
+            command=lambda: gui.destroy(),
+            accelerator="Ctrl+Q",
+            underline=0,
+        )
 
         tools_menu = tk.Menu(menu, tearoff=0)
         menu.add_cascade(label="Tools", menu=tools_menu)
@@ -20,6 +25,7 @@ class Menu:
             label="Open MIDI debug window",
             command=lambda: gui.open_midi_debug_modal(),
             state=tk.DISABLED,
+            underline=5,
         )
         self._tools_menu = tools_menu
 

@@ -11,6 +11,7 @@ from .gui import GUI
 
 logger = logging.getLogger("obs_midi.gui")
 ROOT_DIR = Path(__file__).parent.parent
+TK_THEME = "yaru"
 
 
 def run_gui() -> None:
@@ -44,7 +45,8 @@ def _run_gui() -> None:
 
     root = ThemedTk(
         className=WM_CLASS_NAME,
-        theme="yaru",
+        theme=TK_THEME,
+        themebg=True,
     )
 
     GUI(root)
