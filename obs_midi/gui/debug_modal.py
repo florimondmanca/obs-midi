@@ -10,9 +10,9 @@ from .constants import WM_CLASS_NAME
 
 class DebugModal(tk.Toplevel):
     def __init__(
-        self, parent: tk.Widget, *, midi_input: str, triggers: list[MIDITrigger]
+        self, root: tk.Tk, *, midi_input: str, triggers: list[MIDITrigger]
     ) -> None:
-        super().__init__(parent, class_=WM_CLASS_NAME)
+        super().__init__(root, class_=WM_CLASS_NAME)
         self.title("OBS MIDI - Debug")
 
         triggers = sorted(triggers, key=lambda t: t.sort_key())
