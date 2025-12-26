@@ -13,6 +13,7 @@ from .obs_init import ObsInitThread
 logger = logging.getLogger(__name__)
 
 INFO_MIDI_INPUT_PORT_NAME = "midi_input_port_name"
+INFO_MIDI_TRIGGERS = "midi_triggers"
 
 
 def run(
@@ -84,7 +85,11 @@ def run(
             logger.error("Aborting...")
         else:
             obs_init_thread.join()
-            on_ready({INFO_MIDI_INPUT_PORT_NAME: midi_input_thread.get_port_name()})
+            info = {
+                INFO_MIDI_INPUT_PORT_NAME: midi_input_thread.get_port_name(),
+                INFO_MIDI_TRIGGERS: obs_actions.get_triggers(),
+            }
+            on_ready(info)
             logger.info("Ready")
 
             close_event.wait()

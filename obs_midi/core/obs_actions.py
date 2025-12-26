@@ -9,21 +9,42 @@ from .obs_client import ObsClient
 
 logger = logging.getLogger(__name__)
 
+# NOTE: Mido channels are 0-based
+
+
+def _compare_msg(one: mido.Message, two: mido.Message, attrs: list[str]) -> bool:
+    onedict = one.dict()
+    twodict = two.dict()
+
+    for k in attrs:
+        if onedict[k] != twodict[k]:
+            return False
+
+    return True
+
 
 @dataclass(frozen=True, kw_only=True)
 class ControlChangeTrigger:
     text: str
-    channel: int
-    number: int
-    value: int
+    message: mido.Message
+
+    @property
+    def channel(self) -> int:
+        return self.message.channel + 1
+
+    @property
+    def number(self) -> int:
+        return self.message.control
+
+    @property
+    def value(self) -> int:
+        return self.message.value
+
+    def get_message(self) -> mido.Message:
+        return self.message
 
     def matches(self, msg: mido.Message) -> bool:
-        return (
-            msg.type == "control_change"
-            and msg.channel + 1 == self.channel
-            and msg.control == self.number
-            and msg.value == self.value
-        )
+        return _compare_msg(msg, self.message, ["type", "channel", "control", "value"])
 
     def __str__(self) -> str:
         return f"CC{self.number}#{self.value}@{self.channel}"
@@ -43,26 +64,34 @@ class ControlChangeTrigger:
         if m is None:
             return None
 
-        return cls(
-            text=text.strip(),
-            channel=int(m.group("channel")),
-            number=int(m.group("number")),
+        message = mido.Message(
+            "control_change",
+            channel=int(m.group("channel")) - 1,
+            control=int(m.group("number")),
             value=int(m.group("value")),
         )
+
+        return cls(text=text.strip(), message=message)
 
 
 @dataclass(frozen=True, kw_only=True)
 class ProgramChangeTrigger:
     text: str
-    channel: int
-    number: int
+    message: mido.Message
+
+    @property
+    def channel(self) -> int:
+        return self.message.channel + 1
+
+    @property
+    def number(self) -> int:
+        return self.message.program
+
+    def get_message(self) -> mido.Message:
+        return self.message
 
     def matches(self, msg: mido.Message) -> bool:
-        return (
-            msg.type == "program_change"
-            and msg.channel + 1 == self.channel
-            and msg.program == self.number
-        )
+        return _compare_msg(msg, self.message, ["type", "channel", "program"])
 
     def __str__(self) -> str:
         return f"PC{self.number}@{self.channel}"
@@ -80,30 +109,39 @@ class ProgramChangeTrigger:
         if m is None:
             return None
 
-        return cls(
-            text=text.strip(),
-            channel=int(m.group("channel")),
-            number=int(m.group("number")),
+        message = mido.Message(
+            "program_change",
+            channel=int(m.group("channel")) - 1,
+            program=int(m.group("number")),
         )
+
+        return cls(text=text.strip(), message=message)
 
 
 @dataclass(frozen=True, kw_only=True)
 class NoteOnTrigger:
     text: str
-    channel: int
-    note: int
+    message: mido.Message
     velocity: int | None
 
+    @property
+    def channel(self) -> int:
+        return self.message.channel + 1
+
+    @property
+    def note(self) -> int:
+        return self.message.note
+
+    def get_message(self) -> mido.Message:
+        return self.message.copy(
+            velocity=127 if self.velocity is None else self.velocity
+        )
+
     def matches(self, msg: mido.Message) -> bool:
-        return (
-            msg.type == "note_on"
-            and msg.channel + 1 == self.channel
-            and msg.note == self.note
-            and (
-                msg.velocity >= 64
-                if self.velocity is None
-                else msg.velocity == self.velocity
-            )
+        return _compare_msg(msg, self.message, ["type", "channel", "note"]) and (
+            msg.velocity >= 64
+            if self.velocity is None
+            else msg.velocity == self.velocity
         )
 
     def __str__(self) -> str:
@@ -124,10 +162,15 @@ class NoteOnTrigger:
         if m is None:
             return None
 
+        message = mido.Message(
+            "note_on",
+            channel=int(m.group("channel")) - 1,
+            note=int(m.group("note")),
+        )
+
         return cls(
             text=text.strip(),
-            channel=int(m.group("channel")),
-            note=int(m.group("note")),
+            message=message,
             velocity=int(v) if (v := m.group("velocity")) is not None else None,
         )
 
@@ -152,6 +195,17 @@ class ObsActions:
     def __init__(self) -> None:
         self._scene_switches: list[tuple[str, MIDITrigger]] = []
         self._source_filter_toggles: list[tuple[str, str, MIDITrigger]] = []
+
+    def get_triggers(self) -> list[MIDITrigger]:
+        triggers = []
+
+        for _, trigger in self._scene_switches:
+            triggers.append(trigger)
+
+        for _, _, trigger in self._source_filter_toggles:
+            triggers.append(trigger)
+
+        return triggers
 
     def on_scene_found(self, scene: str) -> None:
         if (trigger := _parse_midi_trigger(scene)) is not None:

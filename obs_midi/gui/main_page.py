@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import TYPE_CHECKING, Callable
 
-from ..core.main import INFO_MIDI_INPUT_PORT_NAME, run
+from ..core.main import INFO_MIDI_INPUT_PORT_NAME, INFO_MIDI_TRIGGERS, run
 from ..core.midi_in import mido_input_opener
 from .config_form import ConfigForm
 from .debug_modal import DebugModal
@@ -52,7 +52,9 @@ class MainPage(ttk.Frame):
         assert self._application_info is not None
 
         self._debug_modal = DebugModal(
-            self, midi_input=self._application_info[INFO_MIDI_INPUT_PORT_NAME]
+            self,
+            midi_input=self._application_info[INFO_MIDI_INPUT_PORT_NAME],
+            triggers=self._application_info[INFO_MIDI_TRIGGERS],
         )
 
         def on_debug_modal_closed() -> None:
