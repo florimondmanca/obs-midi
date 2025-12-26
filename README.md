@@ -22,11 +22,11 @@ I initially developed this software for my own use, i.e. using OBS as a video cl
 - Cross-platform (although primarily tested on Linux Mint)
 - Actions: scene switching, filter toggling
 - WYSIWYG configuration: define MIDI triggers directly in scene or filter names.
+- Supports PC and CC messages
 
 Limitations:
 
 - Requires a working Python environment to package from source.
-- Only MIDI CC can be used as triggers, for now.
 
 ## Requirements
 
@@ -54,7 +54,7 @@ See [official docs](https://obsproject.com/kb/remote-control-guide) for more inf
 
 OBS MIDI reads MIDI triggers directly from scene and filter names. This ensures the MIDI configuration is always in sync and visible in your OBS session.
 
-For MIDI CC, the format should be:
+For **MIDI CC**, the format should be:
 
 ```
 My Scene Name :: CC<number>#<value>@<channel>
@@ -67,6 +67,20 @@ Home screen :: CC20#127@3
 ```
 
 then receiving MIDI CC 20 with value 127 on channel 3 will make OBS switch to the "Home screen" scene.
+
+For **MIDI PC**, the format:
+
+```
+My Scene Name :: PC<number>@<channel>
+```
+
+For example, if a scene is named:
+
+```
+Home screen :: PC2@3
+```
+
+then receiving MIDI PC 2 on channel 3 will make OBS switch to the "Home screen" scene.
 
 ### Running via the GUI (recommended)
 

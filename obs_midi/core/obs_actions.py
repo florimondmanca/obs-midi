@@ -18,16 +18,12 @@ class ControlChangeTrigger:
     value: int
 
     def matches(self, msg: mido.Message) -> bool:
-        if not msg.is_cc(self.number):
-            return False
-
-        if msg.channel + 1 != self.channel:
-            return False
-
-        if msg.value != self.value:
-            return False
-
-        return True
+        return (
+            msg.type == "control_change"
+            and msg.channel + 1 == self.channel
+            and msg.control == self.number
+            and msg.value == self.value
+        )
 
     def __str__(self) -> str:
         return f"CC{self.number}#{self.value}@{self.channel}"
@@ -55,7 +51,53 @@ class ControlChangeTrigger:
         )
 
 
-MIDITrigger = ControlChangeTrigger
+@dataclass(frozen=True, kw_only=True)
+class ProgramChangeTrigger:
+    text: str
+    channel: int
+    number: int
+
+    def matches(self, msg: mido.Message) -> bool:
+        return (
+            msg.type == "program_change"
+            and msg.channel + 1 == self.channel
+            and msg.program == self.number
+        )
+
+    def __str__(self) -> str:
+        return f"PC{self.number}@{self.channel}"
+
+    @classmethod
+    def parse(cls, s: str) -> Optional["ProgramChangeTrigger"]:
+        text, sep, encoded = s.rpartition("::")
+
+        if not sep:
+            return None
+
+        # Example: PC32@8
+        m = re.match(r"PC(?P<number>\d+)@(?P<channel>\d+)", encoded.strip())
+
+        if m is None:
+            return None
+
+        return cls(
+            text=text.strip(),
+            channel=int(m.group("channel")),
+            number=int(m.group("number")),
+        )
+
+
+MIDITrigger = ProgramChangeTrigger | ControlChangeTrigger
+
+
+def _parse_midi_trigger(value: str) -> MIDITrigger | None:
+    if (pc := ProgramChangeTrigger.parse(value)) is not None:
+        return pc
+
+    if (cc := ControlChangeTrigger.parse(value)) is not None:
+        return cc
+
+    return None
 
 
 class ObsActions:
@@ -64,13 +106,13 @@ class ObsActions:
         self._source_filter_toggles: list[tuple[str, str, MIDITrigger]] = []
 
     def on_scene_found(self, scene: str) -> None:
-        if (cc := ControlChangeTrigger.parse(scene)) is not None:
-            self._scene_switches.append((scene, cc))
+        if (trigger := _parse_midi_trigger(scene)) is not None:
+            self._scene_switches.append((scene, trigger))
             logger.info("Added scene switch action: %s", scene)
 
     def on_source_filter_found(self, *, source_name: str, filter_name: str) -> None:
-        if (cc := ControlChangeTrigger.parse(filter_name)) is not None:
-            self._source_filter_toggles.append((source_name, filter_name, cc))
+        if (trigger := _parse_midi_trigger(filter_name)) is not None:
+            self._source_filter_toggles.append((source_name, filter_name, trigger))
             logger.info("Added filter toggle action: %s", filter_name)
 
     def process(self, msg: mido.Message, client: ObsClient) -> None:

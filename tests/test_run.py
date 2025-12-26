@@ -56,14 +56,17 @@ def test_run_full() -> None:
             # Non-registered message
             callback(mido.Message("control_change", channel=0, control=32, value=64))
 
-            # First scene
+            # Scene 1
             callback(mido.Message("control_change", channel=0, control=9, value=1))
 
-            # Second scene
+            # Scene 2
             callback(mido.Message("control_change", channel=1, control=19, value=64))
 
-            # Third scene
+            # Scene 3
             callback(mido.Message("control_change", channel=12, control=29, value=127))
+
+            # Scene 4
+            callback(mido.Message("program_change", channel=5, program=23))
 
             # Filter
             callback(mido.Message("control_change", channel=6, control=8, value=10))
@@ -98,6 +101,7 @@ def test_run_full() -> None:
                 "Scene1 :: CC9#1@1",
                 "Scene2 :: CC19#64@2",
                 "Scene3 :: CC29#127@13",
+                "Scene4 :: PC23@6",
             ]
             flash_source_name = "Flash Effect"
             flash_filter_name = "Flash :: CC08#010@07"  # Test leading zeroes
@@ -190,7 +194,13 @@ def test_run_full() -> None:
             assert msg["d"]["requestType"] == "SetCurrentProgramScene"
             assert msg["d"]["requestData"]["sceneName"] == scenes[2]
 
-            # MIDI message #4 requests toggling flash filter
+            # MIDI message #4 requests switching to Scene4
+            msg = json.loads(ws.recv())
+            assert msg["op"] == 6
+            assert msg["d"]["requestType"] == "SetCurrentProgramScene"
+            assert msg["d"]["requestData"]["sceneName"] == scenes[3]
+
+            # MIDI message #5 requests toggling flash filter
             msg = json.loads(ws.recv())
             assert msg["op"] == 6
             assert msg["d"]["requestType"] == "SetSourceFilterEnabled"
