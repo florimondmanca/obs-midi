@@ -15,6 +15,8 @@ class DebugModal(tk.Toplevel):
         super().__init__(parent, class_=WM_CLASS_NAME)
         self.title("OBS MIDI - Debug")
 
+        triggers = sorted(triggers, key=lambda t: t.sort_key())
+
         # Keep reference to hold port open
         self._output = mido.open_output(midi_input)
 

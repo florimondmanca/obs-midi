@@ -49,6 +49,9 @@ class ControlChangeTrigger:
     def __str__(self) -> str:
         return f"CC{self.number}#{self.value}@{self.channel}"
 
+    def sort_key(self) -> tuple:
+        return (self.channel, 2, self.number, self.value)
+
     @classmethod
     def parse(cls, s: str) -> Optional["ControlChangeTrigger"]:
         text, sep, encoded = s.rpartition("::")
@@ -95,6 +98,9 @@ class ProgramChangeTrigger:
 
     def __str__(self) -> str:
         return f"PC{self.number}@{self.channel}"
+
+    def sort_key(self) -> tuple:
+        return (self.channel, 1, self.number)
 
     @classmethod
     def parse(cls, s: str) -> Optional["ProgramChangeTrigger"]:
@@ -146,6 +152,9 @@ class NoteOnTrigger:
 
     def __str__(self) -> str:
         return f"On{self.note}@{self.channel}"
+
+    def sort_key(self) -> tuple:
+        return (self.channel, 2, self.note, self.velocity or 0)
 
     @classmethod
     def parse(cls, s: str) -> Optional["NoteOnTrigger"]:
