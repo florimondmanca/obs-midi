@@ -20,9 +20,9 @@ I initially developed this software for my own use, i.e. using OBS as a video cl
 
 - Nice and simple GUI program
 - Cross-platform (although primarily tested on Linux Mint)
-- Actions: scene switching, filter toggling
 - WYSIWYG configuration: define MIDI triggers directly in scene or filter names.
-- Supports PC and CC messages
+- Supported MIDI trigger messages: PC, CC, Note On
+- Actions: scene switching, filter toggling
 
 Limitations:
 
@@ -68,7 +68,7 @@ Home screen :: CC20#127@3
 
 then receiving MIDI CC 20 with value 127 on channel 3 will make OBS switch to the "Home screen" scene.
 
-For **MIDI PC**, the format:
+For **MIDI PC**, the format is:
 
 ```
 My Scene Name :: PC<number>@<channel>
@@ -81,6 +81,22 @@ Home screen :: PC2@3
 ```
 
 then receiving MIDI PC 2 on channel 3 will make OBS switch to the "Home screen" scene.
+
+For **Note On**, the format is:
+
+```
+My Scene Name :: On<number>(#<velocity>)?@<channel>
+```
+
+For example, if a scene is named:
+
+```
+Home screen :: On60#127@12
+```
+
+then receiving note 60 (C4) on channel 3 with velocity 127 will make OBS switch to the "Home screen" scene.
+
+Note that the velocity is optional; if omitted, velocities of 64 or more will trigger the scene switch.
 
 ### Running via the GUI (recommended)
 

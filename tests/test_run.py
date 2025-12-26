@@ -68,6 +68,14 @@ def test_run_full() -> None:
             # Scene 4
             callback(mido.Message("program_change", channel=5, program=23))
 
+            # Scene 5 -- miss then hit
+            callback(mido.Message("note_on", channel=6, note=64, velocity=63))
+            callback(mido.Message("note_on", channel=6, note=64, velocity=64))
+
+            # Scene 6 -- miss then hit
+            callback(mido.Message("note_on", channel=7, note=65, velocity=126))
+            callback(mido.Message("note_on", channel=7, note=65, velocity=127))
+
             # Filter
             callback(mido.Message("control_change", channel=6, control=8, value=10))
 
@@ -102,6 +110,8 @@ def test_run_full() -> None:
                 "Scene2 :: CC19#64@2",
                 "Scene3 :: CC29#127@13",
                 "Scene4 :: PC23@6",
+                "Scene5 :: On64@7",
+                "Scene6 :: On65#127@8",
             ]
             flash_source_name = "Flash Effect"
             flash_filter_name = "Flash :: CC08#010@07"  # Test leading zeroes
@@ -176,31 +186,43 @@ def test_run_full() -> None:
                 )
             )
 
-            # MIDI message #1 requests switching to Scene1
+            # Switch to Scene1
             msg = json.loads(ws.recv())
             assert msg["op"] == 6
             assert msg["d"]["requestType"] == "SetCurrentProgramScene"
             assert msg["d"]["requestData"]["sceneName"] == scenes[0]
 
-            # MIDI message #2 requests switching to Scene2
+            # Switch to Scene2
             msg = json.loads(ws.recv())
             assert msg["op"] == 6
             assert msg["d"]["requestType"] == "SetCurrentProgramScene"
             assert msg["d"]["requestData"]["sceneName"] == scenes[1]
 
-            # MIDI message #3 requests switching to Scene3
+            # Switch to Scene3
             msg = json.loads(ws.recv())
             assert msg["op"] == 6
             assert msg["d"]["requestType"] == "SetCurrentProgramScene"
             assert msg["d"]["requestData"]["sceneName"] == scenes[2]
 
-            # MIDI message #4 requests switching to Scene4
+            # Switch to Scene4
             msg = json.loads(ws.recv())
             assert msg["op"] == 6
             assert msg["d"]["requestType"] == "SetCurrentProgramScene"
             assert msg["d"]["requestData"]["sceneName"] == scenes[3]
 
-            # MIDI message #5 requests toggling flash filter
+            # Switch to Scene5
+            msg = json.loads(ws.recv())
+            assert msg["op"] == 6
+            assert msg["d"]["requestType"] == "SetCurrentProgramScene"
+            assert msg["d"]["requestData"]["sceneName"] == scenes[4]
+
+            # Switch to Scene6
+            msg = json.loads(ws.recv())
+            assert msg["op"] == 6
+            assert msg["d"]["requestType"] == "SetCurrentProgramScene"
+            assert msg["d"]["requestData"]["sceneName"] == scenes[5]
+
+            # Toggle flash filter
             msg = json.loads(ws.recv())
             assert msg["op"] == 6
             assert msg["d"]["requestType"] == "SetSourceFilterEnabled"

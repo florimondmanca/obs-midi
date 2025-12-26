@@ -87,7 +87,52 @@ class ProgramChangeTrigger:
         )
 
 
-MIDITrigger = ProgramChangeTrigger | ControlChangeTrigger
+@dataclass(frozen=True, kw_only=True)
+class NoteOnTrigger:
+    text: str
+    channel: int
+    note: int
+    velocity: int | None
+
+    def matches(self, msg: mido.Message) -> bool:
+        return (
+            msg.type == "note_on"
+            and msg.channel + 1 == self.channel
+            and msg.note == self.note
+            and (
+                msg.velocity >= 64
+                if self.velocity is None
+                else msg.velocity == self.velocity
+            )
+        )
+
+    def __str__(self) -> str:
+        return f"On{self.note}@{self.channel}"
+
+    @classmethod
+    def parse(cls, s: str) -> Optional["NoteOnTrigger"]:
+        text, sep, encoded = s.rpartition("::")
+
+        if not sep:
+            return None
+
+        # Example: On60#127@8, On60@8
+        m = re.match(
+            r"On(?P<note>\d+)(#(?P<velocity>\d+))?@(?P<channel>\d+)", encoded.strip()
+        )
+
+        if m is None:
+            return None
+
+        return cls(
+            text=text.strip(),
+            channel=int(m.group("channel")),
+            note=int(m.group("note")),
+            velocity=int(v) if (v := m.group("velocity")) is not None else None,
+        )
+
+
+MIDITrigger = ProgramChangeTrigger | ControlChangeTrigger | NoteOnTrigger
 
 
 def _parse_midi_trigger(value: str) -> MIDITrigger | None:
@@ -96,6 +141,9 @@ def _parse_midi_trigger(value: str) -> MIDITrigger | None:
 
     if (cc := ControlChangeTrigger.parse(value)) is not None:
         return cc
+
+    if (note_on := NoteOnTrigger.parse(value)) is not None:
+        return note_on
 
     return None
 
