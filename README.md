@@ -2,6 +2,8 @@
 
 A bridge to control [OBS](https://obsproject.com/) using MIDI, powered by the native [WebSocket Remote Control](https://obsproject.com/kb/remote-control-guide) capabilities of OBS.
 
+![](assets/gui.png)
+
 ## Why?
 
 As of December 2025, OBS does not have native MIDI control.
