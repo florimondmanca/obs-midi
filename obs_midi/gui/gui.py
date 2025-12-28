@@ -38,6 +38,7 @@ class GUI:
         main_page.grid_rowconfigure(0, weight=1)
 
         root.protocol("WM_DELETE_WINDOW", self.destroy)  # Window close button
+        root.bind("<Control-w>", lambda *args: self.destroy())
         root.bind("<Control-q>", lambda *args: self.destroy())
 
         logger.info("Ready")
