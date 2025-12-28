@@ -23,7 +23,7 @@ format:
 	venv/bin/ruff format
 
 test:
-	venv/bin/pytest -s
+	venv/bin/pytest ${ARGS}
 
 cli:
 	venv/bin/python -m obs_midi.cli ${ARGS}
