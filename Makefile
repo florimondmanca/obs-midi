@@ -39,3 +39,5 @@ dist:
 
 clean:
 	rm -r dist
+
+ci: install install_dev test

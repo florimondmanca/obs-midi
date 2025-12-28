@@ -1,0 +1,9 @@
+when:
+  - event: push
+    branch: main
+
+steps:
+  - name: ci
+    image: python:3.12
+    commands:
+      - make ci

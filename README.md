@@ -1,5 +1,7 @@
 # OBS MIDI
 
+[![](https://ci.codeberg.org/api/badges/15854/status.svg)](https://ci.codeberg.org/repos/15854)
+
 A bridge to control [OBS](https://obsproject.com/) using MIDI, powered by the native [WebSocket Remote Control](https://obsproject.com/kb/remote-control-guide) capabilities of OBS.
 
 ![](assets/gui.png)
